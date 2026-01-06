@@ -11,10 +11,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app import crud
 from app.core.config import settings
 from app.core.security import decode_token
-from app.db.session import SessionLocal, SessionLocalCelery
+from app.db.session import SessionLocal
 from app.models.user_model import User
 from app.schemas.common_schema import IMetaGeneral, TokenType
-from app.utils.minio_client import MinioClient
+from app.utils.gcs_client import GCSClient
+from app.utils.local_storage_client import LocalStorageClient
 from app.utils.token import get_valid_tokens
 
 reusable_oauth2 = OAuth2PasswordBearer(
@@ -34,11 +35,6 @@ async def get_redis_client() -> Redis:
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with SessionLocal() as session:
-        yield session
-
-
-async def get_jobs_db() -> AsyncGenerator[AsyncSession, None]:
-    async with SessionLocalCelery() as session:
         yield session
 
 
@@ -103,11 +99,10 @@ def get_current_user(required_roles: list[str] = None) -> Callable[[], User]:
     return current_user
 
 
-def minio_auth() -> MinioClient:
-    minio_client = MinioClient(
-        access_key=settings.MINIO_ROOT_USER,
-        secret_key=settings.MINIO_ROOT_PASSWORD,
-        bucket_name=settings.MINIO_BUCKET,
-        minio_url=settings.MINIO_URL,
-    )
-    return minio_client
+def storage_client():
+    if settings.STORAGE_BACKEND == "gcs":
+        return GCSClient(
+            bucket_name=settings.GCS_BUCKET or "frontend-assets",
+            url_expire_minutes=settings.GCS_SIGNED_URL_EXPIRE_MINUTES,
+        )
+    return LocalStorageClient(base_path=settings.LOCAL_MEDIA_PATH)

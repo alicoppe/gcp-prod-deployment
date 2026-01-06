@@ -28,21 +28,3 @@ SessionLocal = sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
-
-engine_celery = create_async_engine(
-    str(settings.ASYNC_CELERY_BEAT_DATABASE_URI),
-    echo=False,
-    poolclass=NullPool
-    if settings.MODE == ModeEnum.testing
-    else AsyncAdaptedQueuePool,  # Asincio pytest works with NullPool
-    # pool_size=POOL_SIZE,
-    # max_overflow=64,
-)
-
-SessionLocalCelery = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine_celery,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)

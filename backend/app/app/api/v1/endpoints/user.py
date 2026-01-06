@@ -13,7 +13,7 @@ from app.api import deps
 from app.deps import user_deps
 from app.models import User, UserFollow
 from app.models.role_model import Role
-from app.utils.minio_client import MinioClient
+from app.utils.gcs_client import GCSClient
 from app.utils.resize_image import modify_image
 from fastapi import (
     APIRouter,
@@ -416,14 +416,14 @@ async def upload_my_image(
     description: str | None = Body(None),
     image_file: UploadFile = File(...),
     current_user: User = Depends(deps.get_current_user()),
-    minio_client: MinioClient = Depends(deps.minio_auth),
+    storage_client: GCSClient = Depends(deps.storage_client),
 ) -> IPostResponseBase[IUserRead]:
     """
     Uploads a user image
     """
     try:
         image_modified = modify_image(BytesIO(image_file.file.read()))
-        data_file = minio_client.put_object(
+        data_file = storage_client.put_object(
             file_name=image_file.filename,
             file_data=BytesIO(image_modified.file_data),
             content_type=image_file.content_type,
@@ -454,7 +454,7 @@ async def upload_user_image(
     current_user: User = Depends(
         deps.get_current_user(required_roles=[IRoleEnum.admin])
     ),
-    minio_client: MinioClient = Depends(deps.minio_auth),
+    storage_client: GCSClient = Depends(deps.storage_client),
 ) -> IPostResponseBase[IUserRead]:
     """
     Uploads a user image by his/her id
@@ -464,7 +464,7 @@ async def upload_user_image(
     """
     try:
         image_modified = modify_image(BytesIO(image_file.file.read()))
-        data_file = minio_client.put_object(
+        data_file = storage_client.put_object(
             file_name=image_file.filename,
             file_data=BytesIO(image_modified.file_data),
             content_type=image_file.content_type,

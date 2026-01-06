@@ -142,3 +142,19 @@ sonarqube/data
 sonarqube/logs
 
 .terraform
+*.tfstate
+*.tfstate.backup
+infra/terraform/.terraform/*
+infra/terraform/plan.out
+
+# Frontend build artifacts
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/.turbo
+
+# Local uploaded media
+static/uploads
+
+# Agent notes
+AGENTS.md

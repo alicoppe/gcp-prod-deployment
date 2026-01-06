@@ -18,6 +18,7 @@ services:
       MODE: "testing"      
     depends_on:
       - database
+      - redis_server
     links:
       - caddy_reverse_proxy:storage.localhost
 
@@ -47,52 +48,6 @@ services:
       - 6379
     env_file: .env
 
-  celery_worker:
-    container_name: celery_worker
-    restart: always
-    # platform: linux/arm64/v8
-    build: ./backend
-    command: "watchfiles 'celery -A app.core.celery worker -l info' "
-    volumes:
-      - ./backend/app:/code
-      # - "${EB_LOG_BASE_DIR}/php-app:/var/log/celery"
-    depends_on:
-      - database
-      - redis_server
-    env_file: .env
-  
-  celery_beat:  #Good for crontab and schedule tasks
-    container_name: celery_beat
-    restart: always
-    # platform: linux/arm64/v8
-    build:
-      context: ./backend
-      args:
-        INSTALL_DEV: ${INSTALL_DEV-false}
-    command: celery -A app.core.celery beat -l info -S celery_sqlalchemy_scheduler.schedulers:DatabaseScheduler -l info
-    volumes:
-      - ./backend/app:/code
-      # - "${EB_LOG_BASE_DIR}/php-app:/var/log/celery-beat"
-    depends_on:
-      - database
-      - redis_server
-    env_file: .env
-
-  minio_server:
-    image: minio/minio:latest
-    restart: always
-    container_name: minio_server
-    volumes:
-      - ./minio/data:/data
-    expose:
-      - 9000
-      - 9091
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_BROWSER_REDIRECT_URL: http://stash.localhost
-    command: "server /data --console-address ':9090'"    
-
   caddy_reverse_proxy:
     container_name: caddy_reverse_proxy
     image: caddy:alpine
@@ -109,6 +64,21 @@ services:
       - ./static:/code/static
       - caddy_data:/data
       - caddy_config:/config
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+    command: npm run dev -- --host --port 5173
+    restart: always
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    env_file: .env
+    expose:
+      - 5173
+    depends_on:
+      - fastapi_server
 
 volumes:
   db_docker:

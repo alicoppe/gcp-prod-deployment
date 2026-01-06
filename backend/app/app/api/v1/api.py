@@ -10,7 +10,7 @@ from app.api.v1.endpoints import (
     cache,
     weather,
     report,
-    periodic_tasks,
+    pubsub,
 )
 
 api_router = APIRouter()
@@ -26,6 +26,6 @@ api_router.include_router(report.router, prefix="/report", tags=["report"])
 api_router.include_router(
     natural_language.router, prefix="/natural_language", tags=["natural_language"]
 )
+api_router.include_router(pubsub.router, prefix="", tags=["pubsub"])
 api_router.include_router(
-    periodic_tasks.router, prefix="/periodic_tasks", tags=["periodic_tasks"]
 )

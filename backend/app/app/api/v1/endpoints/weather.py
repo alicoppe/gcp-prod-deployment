@@ -36,7 +36,7 @@ def do_sync_work(city: str):
     """
     Gets weather by sync work
     """
-    # This similar aproach will be used to interface with celery
+    # Placeholder for future background processing via Pub/Sub + Cloud Run
     weather = syncify(get_weather_async)(city=city)
     return weather
 

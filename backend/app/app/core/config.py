@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     DATABASE_HOST: str
     DATABASE_PORT: int
     DATABASE_NAME: str
-    DATABASE_CELERY_NAME: str = "celery_schedule_jobs"
     REDIS_HOST: str
     REDIS_PORT: str
     DB_POOL_SIZE: int = 83
@@ -48,67 +47,13 @@ class Settings(BaseSettings):
                 )
         return v
 
-    SYNC_CELERY_DATABASE_URI: PostgresDsn | str = ""
-
-    @field_validator("SYNC_CELERY_DATABASE_URI", mode="after")
-    def assemble_celery_db_connection(
-        cls, v: str | None, info: FieldValidationInfo
-    ) -> Any:
-        if isinstance(v, str):
-            if v == "":
-                return PostgresDsn.build(
-                    scheme="db+postgresql",
-                    username=info.data["DATABASE_USER"],
-                    password=info.data["DATABASE_PASSWORD"],
-                    host=info.data["DATABASE_HOST"],
-                    port=info.data["DATABASE_PORT"],
-                    path=info.data["DATABASE_CELERY_NAME"],
-                )
-        return v
-
-    SYNC_CELERY_BEAT_DATABASE_URI: PostgresDsn | str = ""
-
-    @field_validator("SYNC_CELERY_BEAT_DATABASE_URI", mode="after")
-    def assemble_celery_beat_db_connection(
-        cls, v: str | None, info: FieldValidationInfo
-    ) -> Any:
-        if isinstance(v, str):
-            if v == "":
-                return PostgresDsn.build(
-                    scheme="postgresql+psycopg2",
-                    username=info.data["DATABASE_USER"],
-                    password=info.data["DATABASE_PASSWORD"],
-                    host=info.data["DATABASE_HOST"],
-                    port=info.data["DATABASE_PORT"],
-                    path=info.data["DATABASE_CELERY_NAME"],
-                )
-        return v
-
-    ASYNC_CELERY_BEAT_DATABASE_URI: PostgresDsn | str = ""
-
-    @field_validator("ASYNC_CELERY_BEAT_DATABASE_URI", mode="after")
-    def assemble_async_celery_beat_db_connection(
-        cls, v: str | None, info: FieldValidationInfo
-    ) -> Any:
-        if isinstance(v, str):
-            if v == "":
-                return PostgresDsn.build(
-                    scheme="postgresql+asyncpg",
-                    username=info.data["DATABASE_USER"],
-                    password=info.data["DATABASE_PASSWORD"],
-                    host=info.data["DATABASE_HOST"],
-                    port=info.data["DATABASE_PORT"],
-                    path=info.data["DATABASE_CELERY_NAME"],
-                )
-        return v
-
     FIRST_SUPERUSER_EMAIL: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
 
-    MINIO_ROOT_USER: str
-    MINIO_ROOT_PASSWORD: str
-    MINIO_URL: str
-    MINIO_BUCKET: str
+    STORAGE_BACKEND: str = "local"  # gcs | local
+    GCS_BUCKET: str | None = None
+    GCS_SIGNED_URL_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    LOCAL_MEDIA_PATH: str = "static/uploads"
 
     WHEATER_URL: AnyHttpUrl
 

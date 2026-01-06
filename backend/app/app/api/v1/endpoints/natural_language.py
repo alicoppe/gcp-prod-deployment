@@ -1,11 +1,9 @@
 from datetime import datetime, timedelta
 from app.api import deps
-from app.api.celery_task import predict_transformers_pipeline
 from app.models.user_model import User
 from fastapi import APIRouter, Depends, HTTPException
 from app.utils.fastapi_globals import g
 from app.schemas.response_schema import IPostResponseBase, create_response
-from app.core.celery import celery
 from fastapi_limiter.depends import RateLimiter
 
 router = APIRouter()
@@ -30,72 +28,21 @@ async def sentiment_analysis_prediction(
 
 
 @router.post(
-    "/text_generation_prediction_batch_task",
+    "/text_generation_prediction_pubsub_stub",
     dependencies=[
         Depends(RateLimiter(times=10, hours=24)),
     ],
 )
-async def text_generation_prediction_batch_task(
+async def text_generation_prediction_pubsub_stub(
     prompt: str = "Batman is awesome because",
 ) -> IPostResponseBase:
     """
-    Async batch task for text generation using a NLP model from transformers libray
+    Placeholder endpoint: in production, Cloud Scheduler -> Pub/Sub -> Cloud Run
+    should call a handler that runs the same logic as the old Celery task.
+    For now, this returns the synchronous prediction to mimic behavior.
     """
-    prection_task = predict_transformers_pipeline.delay(prompt)
+    result = g.sentiment_model(prompt)
     return create_response(
-        message="Prediction got succesfully", data={"task_id": prection_task.task_id}
+        message="Prediction got succesfully",
+        data={"task_id": "pubsub-stub", "result": result},
     )
-
-
-@router.post(
-    "/text_generation_prediction_batch_task_after_some_seconds",
-    dependencies=[
-        Depends(RateLimiter(times=10, hours=24)),
-    ],
-)
-async def text_generation_prediction_batch_task_after_some_seconds(
-    prompt: str = "Batman is awesome because", seconds: float = 5
-) -> IPostResponseBase:
-    """
-    Async batch task for text generation using a NLP model from transformers libray
-
-    It is executed after x number of seconds
-    """
-    delay_elapsed = datetime.utcnow() + timedelta(seconds=seconds)
-    prection_task = predict_transformers_pipeline.apply_async(
-        args=[prompt], eta=delay_elapsed
-    )
-    return create_response(
-        message="Prediction got succesfully", data={"task_id": prection_task.task_id}
-    )
-
-
-@router.get(
-    "/get_result_from_batch_task",
-    dependencies=[
-        Depends(RateLimiter(times=10, minutes=1)),
-    ],
-)
-async def get_result_from_batch_task(task_id: str) -> IPostResponseBase:
-    """
-    Get result from batch task using task_id
-    """
-    async_result = celery.AsyncResult(task_id)
-
-    if async_result.ready():
-        if not async_result.successful():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Task {task_id} with state {async_result.state}.",
-            )
-
-        result = async_result.get(timeout=1.0)
-        return create_response(
-            message="Prediction got succesfully",
-            data={"task_id": task_id, "result": result},
-        )
-    else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Task {task_id} does not exist or is still running.",
-        )
