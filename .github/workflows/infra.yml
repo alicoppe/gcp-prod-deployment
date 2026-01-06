@@ -1,67 +1,67 @@
-name: Terraform Plan & Apply
+# name: Terraform Plan & Apply
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+# on:
+#   workflow_dispatch:
+#   push:
+#     branches: [main]
+#   pull_request:
+#     branches: [main]
 
-env:
-  TF_WORKING_DIR: infra/terraform
-  GOOGLE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
-  GOOGLE_REGION: ${{ secrets.GCP_REGION }}
+# env:
+#   TF_WORKING_DIR: infra/terraform
+#   GOOGLE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+#   GOOGLE_REGION: ${{ secrets.GCP_REGION }}
 
-jobs:
-  terraform:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write   # for workload identity federation
-    steps:
-      - uses: actions/checkout@v4
+# jobs:
+#   terraform:
+#     runs-on: ubuntu-latest
+#     permissions:
+#       contents: read
+#       id-token: write   # for workload identity federation
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
+#       - name: Set up Terraform
+#         uses: hashicorp/setup-terraform@v3
+#         with:
+#           terraform_version: 1.6.6
 
-      - name: Authenticate to Google Cloud (WIF)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_TERRAFORM_SA }}
+#       - name: Authenticate to Google Cloud (WIF)
+#         uses: google-github-actions/auth@v2
+#         with:
+#           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+#           service_account: ${{ secrets.GCP_TERRAFORM_SA }}
 
-      - name: Configure gcloud
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.GOOGLE_PROJECT }}
+#       - name: Configure gcloud
+#         uses: google-github-actions/setup-gcloud@v2
+#         with:
+#           project_id: ${{ env.GOOGLE_PROJECT }}
 
-      - name: Terraform Init
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+#       - name: Terraform Init
+#         working-directory: ${{ env.TF_WORKING_DIR }}
+#         run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
 
-      - name: Terraform Plan
-        id: plan
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: |
-          terraform plan \
-            -var="project_id=${{ env.GOOGLE_PROJECT }}" \
-            -var="region=${{ env.GOOGLE_REGION }}" \
-            -var="tf_state_bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -var="api_image=${{ secrets.API_IMAGE }}" \
-            -var="frontend_image=${{ secrets.FRONTEND_IMAGE }}" \
-            -var="db_password=${{ secrets.DB_PASSWORD }}" \
-            -out=plan.out
+#       - name: Terraform Plan
+#         id: plan
+#         working-directory: ${{ env.TF_WORKING_DIR }}
+#         run: |
+#           terraform plan \
+#             -var="project_id=${{ env.GOOGLE_PROJECT }}" \
+#             -var="region=${{ env.GOOGLE_REGION }}" \
+#             -var="tf_state_bucket=${{ secrets.TF_STATE_BUCKET }}" \
+#             -var="api_image=${{ secrets.API_IMAGE }}" \
+#             -var="frontend_image=${{ secrets.FRONTEND_IMAGE }}" \
+#             -var="db_password=${{ secrets.DB_PASSWORD }}" \
+#             -out=plan.out
 
-      - name: Upload Plan
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: tf-plan
-          path: infra/terraform/plan.out
+#       - name: Upload Plan
+#         if: github.event_name == 'pull_request'
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: tf-plan
+#           path: infra/terraform/plan.out
 
-      - name: Terraform Apply
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform apply -auto-approve plan.out
+#       - name: Terraform Apply
+#         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+#         working-directory: ${{ env.TF_WORKING_DIR }}
+#         run: terraform apply -auto-approve plan.out

@@ -146,6 +146,9 @@ sonarqube/logs
 *.tfstate.backup
 infra/terraform/.terraform/*
 infra/terraform/plan.out
+infra/terraform/envs/**/.terraform/*
+infra/terraform/envs/**/terraform.tfstate*
+infra/terraform/envs/**/terraform.tfvars
 
 # Frontend build artifacts
 frontend/node_modules
