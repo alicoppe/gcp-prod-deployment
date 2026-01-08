@@ -191,9 +191,93 @@ Deploy flow:
 - Type check: `make mypy`
 
 ## CI/CD
-- GitHub Actions: `.github/workflows/infra.yml`
-  - PR: terraform plan (artifact uploaded)
-  - main: terraform apply (WIF auth)
+- GitHub Actions workflows:
+  - `ci.yml`: PR validation (backend tests, migrations check, frontend build, Terraform plan)
+  - `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test)
+  - `deploy-prod.yml`: manual prod deploy with GitHub Environment approvals
+
+### Required GitHub Secrets
+Set these in Settings -> Secrets and variables -> Actions.
+
+Repository secrets (shared)
+- GCP_WIF_PROVIDER_DEV: Workload Identity Provider for dev
+- GCP_WIF_PROVIDER_PROD: Workload Identity Provider for prod
+- GCP_SA_CI_DEV: Service account for building/pushing images (dev)
+- GCP_SA_TERRAFORM_DEV: Service account for Terraform (dev)
+- GCP_SA_MIGRATION_DEV: Service account for migrations (dev)
+- DEV_SQL_INSTANCE_CONNECTION: project:region:instance
+- DEV_DATABASE_URL: postgresql+psycopg2://user:pass@127.0.0.1:5432/db
+- GOOGLE_CHAT_WEBHOOK_DEV
+
+Environment secrets (prod)
+- GCP_SA_TERRAFORM_PROD
+- GCP_SA_MIGRATION_PROD
+- PROD_SQL_INSTANCE_CONNECTION
+- PROD_DATABASE_URL
+- GOOGLE_CHAT_WEBHOOK_PROD
+
+Also update `DEV_PROJECT_ID` and `PROD_PROJECT_ID` in the deploy workflows (or replace them with repository variables) to match your GCP projects.
+
+### GitHub Environment setup for prod
+1) Go to Settings -> Environments -> New environment -> name it `prod`.
+2) Enable Required reviewers and add yourself/team.
+3) Optional: add a wait timer (for example, 5 minutes before deployment can proceed).
+4) Add the environment-specific secrets above.
+5) Migrations run under the same `prod` environment approval by default.
+
+Now when you run `deploy-prod.yml`, it will pause at the `terraform-apply-prod` job until you approve in the Actions UI.
+
+### Google Chat notifications (webhooks)
+1) Create a webhook in Google Chat
+   - Open Google Chat and go to the space where you want notifications.
+   - Click the space name -> Apps & integrations.
+   - Click Webhooks -> Add webhooks.
+   - Name it (for example, "CI/CD Notifications").
+   - Click Save and copy the webhook URL.
+
+The URL looks like:
+```
+https://chat.googleapis.com/v1/spaces/AAAA.../messages?key=...&token=...
+```
+
+2) Store webhook URL in GitHub Secrets
+```
+GOOGLE_CHAT_WEBHOOK_DEV
+  Value: https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=...
+
+GOOGLE_CHAT_WEBHOOK_PROD
+  Value: (different space URL if you want separate prod/dev spaces)
+```
+
+### How to use these workflows
+Day-to-day development:
+```bash
+# Work on feature
+git checkout -b feature/my-feature
+
+# Push and open PR to main
+git push origin feature/my-feature
+# CI runs: backend tests, frontend build, migrations check, TF plan
+```
+
+Deploy to dev:
+```bash
+# Merge PR to main
+# deploy-dev.yml automatically runs:
+# 1. Builds images
+# 2. Applies Terraform
+# 3. Runs migrations
+# 4. Smoke tests
+```
+
+Deploy to prod:
+```bash
+# Go to Actions -> Deploy to Production -> Run workflow
+# Input:
+#   backend_image_tag: <commit-sha-from-dev>
+#   frontend_image_tag: <same-sha>
+# Workflow pauses for approval -> apply -> migrations -> smoke test
+```
 
 ## Per-Resource Knobs
 - Cloud SQL: `tier`, `high_availability`, `deletion_protection`, user/password in env root `main.tf`.

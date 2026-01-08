@@ -1,0 +1,270 @@
+name: CI - Pull Request Validation
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Detect what changed to run only relevant checks
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'backend/app/alembic/**'
+              - 'backend/Dockerfile'
+            frontend:
+              - 'frontend/**'
+            infra:
+              - 'infra/terraform/**'
+
+  # Backend: tests + linting
+  backend-tests:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MODE: testing
+      PROJECT_NAME: fastapi-sqlmodel-alembic
+      OPENAI_API_KEY: test
+      DATABASE_USER: test
+      DATABASE_PASSWORD: test
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5432
+      DATABASE_NAME: test
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      FIRST_SUPERUSER_EMAIL: admin@example.com
+      FIRST_SUPERUSER_PASSWORD: admin
+      WHEATER_URL: https://wttr.in
+      BACKEND_CORS_ORIGINS: http://localhost
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip poetry
+          cd backend/app
+          poetry install --no-root --with dev
+          poetry run pip install pytest-cov
+
+      - name: Lint with ruff
+        run: |
+          cd backend/app
+          poetry run ruff app
+
+      - name: Type check with mypy
+        run: |
+          cd backend/app
+          poetry run mypy .
+        continue-on-error: true
+
+      - name: Run tests
+        run: |
+          cd backend/app
+          poetry run pytest --cov --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/app/coverage.xml
+          flags: backend
+        continue-on-error: true
+
+  # Alembic migration validation
+  migrations-check:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MODE: testing
+      PROJECT_NAME: fastapi-sqlmodel-alembic
+      OPENAI_API_KEY: test
+      DATABASE_USER: test
+      DATABASE_PASSWORD: test
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5432
+      DATABASE_NAME: test
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      FIRST_SUPERUSER_EMAIL: admin@example.com
+      FIRST_SUPERUSER_PASSWORD: admin
+      WHEATER_URL: https://wttr.in
+      BACKEND_CORS_ORIGINS: http://localhost
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip poetry
+          cd backend/app
+          poetry install --no-root --only main
+
+      - name: Validate migrations
+        run: |
+          cd backend/app
+          # Check migrations apply cleanly
+          poetry run alembic upgrade head
+
+          # Check for conflicts (no two heads)
+          COUNT=$(poetry run alembic heads | wc -l | tr -d ' ')
+          if [ "$COUNT" != "1" ]; then
+            echo "Multiple migration heads detected"
+            exit 1
+          fi
+
+          # Optional: check downgrade works
+          poetry run alembic downgrade -1
+          poetry run alembic upgrade head
+
+  # Frontend: lint + build
+  frontend-tests:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Lint
+        run: |
+          cd frontend
+          npm run lint --if-present
+
+      - name: Type check
+        run: |
+          cd frontend
+          npm run type-check --if-present
+        continue-on-error: true
+
+      - name: Build
+        run: |
+          cd frontend
+          npm run build
+        env:
+          CI: true
+
+  # Terraform plan for dev
+  terraform-plan-dev:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER_DEV }}
+          service_account: ${{ secrets.GCP_SA_TERRAFORM_DEV }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Terraform init
+        run: |
+          cd infra/terraform/envs/dev
+          terraform init
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          cd infra/terraform/envs/dev
+          terraform plan -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: Post plan to PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "${{ steps.plan.outputs.stdout }}"
+        with:
+          script: |
+            const output = `#### Terraform Plan (Dev)\n\n\`\`\`\n${process.env.PLAN}\n\`\`\`\n*Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

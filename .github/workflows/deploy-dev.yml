@@ -1,0 +1,314 @@
+name: Deploy to Dev
+
+on:
+  push:
+    branches: [main]
+
+env:
+  GCP_REGION: us-central1
+  ARTIFACT_REGISTRY: us-central1-docker.pkg.dev
+  DEV_PROJECT_ID: dev-deployment-483516
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'backend/app/alembic/**'
+              - 'backend/Dockerfile'
+            frontend:
+              - 'frontend/**'
+            infra:
+              - 'infra/terraform/**'
+
+  # Build & push backend image
+  build-backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER_DEV }}
+          service_account: ${{ secrets.GCP_SA_CI_DEV }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }}
+
+      - name: Build and push
+        id: image
+        run: |
+          IMAGE="${{ env.ARTIFACT_REGISTRY }}/${{ env.DEV_PROJECT_ID }}/app/backend:${{ github.sha }}"
+          docker build -t $IMAGE -f backend/Dockerfile backend
+          docker push $IMAGE
+          echo "name=$IMAGE" >> $GITHUB_OUTPUT
+
+  # Build & push frontend image
+  build-frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER_DEV }}
+          service_account: ${{ secrets.GCP_SA_CI_DEV }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }}
+
+      - name: Build and push
+        id: image
+        run: |
+          IMAGE="${{ env.ARTIFACT_REGISTRY }}/${{ env.DEV_PROJECT_ID }}/app/frontend:${{ github.sha }}"
+          docker build -t $IMAGE -f frontend/Dockerfile frontend
+          docker push $IMAGE
+          echo "name=$IMAGE" >> $GITHUB_OUTPUT
+
+  # Terraform apply to dev
+  terraform-apply-dev:
+    needs: [changes, build-backend, build-frontend]
+    if: |
+      always() &&
+      (needs.changes.outputs.infra == 'true' ||
+       needs.changes.outputs.backend == 'true' ||
+       needs.changes.outputs.frontend == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      backend_url: ${{ steps.outputs.outputs.backend_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER_DEV }}
+          service_account: ${{ secrets.GCP_SA_TERRAFORM_DEV }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          cd infra/terraform/envs/dev
+          terraform init
+
+      - name: Terraform apply
+        run: |
+          cd infra/terraform/envs/dev
+          terraform apply -auto-approve \
+            -var="backend_image=${{ needs.build-backend.outputs.image || 'SKIP' }}" \
+            -var="frontend_image=${{ needs.build-frontend.outputs.image || 'SKIP' }}"
+
+      - name: Get outputs
+        id: outputs
+        run: |
+          cd infra/terraform/envs/dev
+          BACKEND_URL=$(terraform output -raw backend_url)
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
+  # Run Alembic migrations against dev Cloud SQL
+  run-migrations-dev:
+    needs: [changes, terraform-apply-dev]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MODE: production
+      PROJECT_NAME: fastapi-sqlmodel-alembic
+      OPENAI_API_KEY: dummy
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      FIRST_SUPERUSER_EMAIL: admin@example.com
+      FIRST_SUPERUSER_PASSWORD: admin
+      WHEATER_URL: https://wttr.in
+      BACKEND_CORS_ORIGINS: http://localhost
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER_DEV }}
+          service_account: ${{ secrets.GCP_SA_MIGRATION_DEV }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip poetry
+          cd backend/app
+          poetry install --no-root --only main
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+          chmod +x cloud_sql_proxy
+          ./cloud_sql_proxy -instances=${{ secrets.DEV_SQL_INSTANCE_CONNECTION }}=tcp:5432 &
+          sleep 5
+
+      - name: Parse database URL
+        env:
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.parse import urlparse, unquote
+
+          url = os.environ["DATABASE_URL"]
+          parsed = urlparse(url)
+          user = unquote(parsed.username or "")
+          password = unquote(parsed.password or "")
+          host = parsed.hostname or ""
+          port = parsed.port or 5432
+          db = (parsed.path or "").lstrip("/")
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"DATABASE_USER={user}\n")
+              f.write(f"DATABASE_PASSWORD={password}\n")
+              f.write(f"DATABASE_HOST={host}\n")
+              f.write(f"DATABASE_PORT={port}\n")
+              f.write(f"DATABASE_NAME={db}\n")
+          PY
+
+      - name: Run migrations
+        run: |
+          cd backend/app
+          poetry run alembic upgrade head
+
+      - name: Verify migration
+        run: |
+          cd backend/app
+          poetry run alembic current
+
+  # Smoke test dev deployment
+  smoke-test-dev:
+    needs: [terraform-apply-dev, run-migrations-dev]
+    if: always() && needs.terraform-apply-dev.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Health check
+        run: |
+          BACKEND_URL="${{ needs.terraform-apply-dev.outputs.backend_url }}"
+          curl -f "$BACKEND_URL/health" || exit 1
+          echo "Dev deployment healthy"
+
+  # Notify Google Chat that dev is ready
+  notify-dev-success:
+    needs: [smoke-test-dev, build-backend, build-frontend]
+    if: always() && needs.smoke-test-dev.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Google Chat notification
+        uses: SimonScholz/google-chat-action@main
+        with:
+          webhookUrl: ${{ secrets.GOOGLE_CHAT_WEBHOOK_DEV }}
+          jobStatus: ${{ job.status }}
+          title: "✅ Dev Deployment Successful"
+          subtitle: "Ready for production deployment"
+          additionalSections: |
+            [
+              {
+                "header": "📦 Deployment Details",
+                "widgets": [
+                  {
+                    "decoratedText": {
+                      "topLabel": "Commit",
+                      "text": "${{ github.sha }}"
+                    }
+                  },
+                  {
+                    "decoratedText": {
+                      "topLabel": "Author",
+                      "text": "${{ github.actor }}"
+                    }
+                  },
+                  {
+                    "decoratedText": {
+                      "topLabel": "Backend Image",
+                      "text": "${{ needs.build-backend.outputs.image }}"
+                    }
+                  },
+                  {
+                    "decoratedText": {
+                      "topLabel": "Frontend Image",
+                      "text": "${{ needs.build-frontend.outputs.image }}"
+                    }
+                  }
+                ]
+              },
+              {
+                "header": "🚀 Next Steps",
+                "widgets": [
+                  {
+                    "buttonList": {
+                      "buttons": [
+                        {
+                          "text": "Deploy to Production",
+                          "onClick": {
+                            "openLink": {
+                              "url": "https://github.com/${{ github.repository }}/actions/workflows/deploy-prod.yml"
+                            }
+                          }
+                        },
+                        {
+                          "text": "View Logs",
+                          "onClick": {
+                            "openLink": {
+                              "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
