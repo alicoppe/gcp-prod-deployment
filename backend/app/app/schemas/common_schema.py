@@ -29,6 +29,7 @@ class IUserMessage(BaseModel):
     """User message schema."""
 
     user_id: UUID | None = None
+    session_id: UUID | None = None
     message: str
 
 
@@ -40,6 +41,7 @@ class IChatResponse(BaseModel):
     sender: str
     message: str
     type: str
+    session_id: UUID | None = None
 
     @field_validator("id", "message_id")
     def check_ids(cls, v):

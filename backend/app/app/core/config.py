@@ -20,7 +20,12 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 1  # 1 hour
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 100  # 100 days
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-3.5-turbo"
+    CHAT_PROVIDER: str = "vertex"  # vertex | openai
+    VERTEX_PROJECT_ID: str | None = None
+    VERTEX_REGION: str | None = None
+    VERTEX_MODEL: str = "gemini-1.5-flash"
     DATABASE_USER: str
     DATABASE_PASSWORD: str
     DATABASE_HOST: str

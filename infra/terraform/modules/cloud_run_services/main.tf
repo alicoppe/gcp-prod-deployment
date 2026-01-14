@@ -24,6 +24,12 @@ resource "google_cloud_run_v2_service" "backend" {
     service_account = google_service_account.backend.email
     containers {
       image = var.backend_image
+      resources {
+        limits = {
+          cpu    = var.backend_cpu
+          memory = var.backend_memory
+        }
+      }
       env {
         name  = "DATABASE_URL"
         value = var.db_connection_string
@@ -71,6 +77,11 @@ resource "google_cloud_run_v2_service" "backend" {
     labels = var.labels
   }
 
+  scaling {
+    min_instance_count = var.backend_min_instances
+    max_instance_count = var.backend_max_instances
+  }
+
   traffic {
     type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
     percent = 100
@@ -88,6 +99,12 @@ resource "google_cloud_run_v2_service" "frontend" {
     service_account = google_service_account.frontend.email
     containers {
       image = var.frontend_image
+      resources {
+        limits = {
+          cpu    = var.frontend_cpu
+          memory = var.frontend_memory
+        }
+      }
       env {
         name  = "VITE_API_URL"
         value = google_cloud_run_v2_service.backend.uri
@@ -98,6 +115,11 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
     }
     labels = var.labels
+  }
+
+  scaling {
+    min_instance_count = var.frontend_min_instances
+    max_instance_count = var.frontend_max_instances
   }
 
   traffic {

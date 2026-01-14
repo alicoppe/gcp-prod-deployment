@@ -23,11 +23,19 @@ export SERVERS_JSON
 help:
 	@echo "make"
 	@echo "    install"
-	@echo "        Install all packages of poetry project locally."
+	@echo "        Install all packages of the uv project locally."
 	@echo "    run-dev-build"
 	@echo "        Run development docker compose and force build containers."
 	@echo "    run-dev"
 	@echo "        Run development docker compose."
+	@echo "    run-frontend"
+	@echo "        Run frontend only (dev compose)."
+	@echo "    run-frontend-build"
+	@echo "        Build + run frontend only (dev compose)."
+	@echo "    run-backend"
+	@echo "        Run backend stack only (API + DB + Redis + Caddy)."
+	@echo "    run-backend-build"
+	@echo "        Build + run backend stack only (API + DB + Redis + Caddy)."
 	@echo "    stop-dev"
 	@echo "        Stop development docker compose."
 	@echo "    run-prod"
@@ -63,14 +71,25 @@ help:
 
 install:
 	cd backend/app && \
-	poetry shell && \
-	poetry install
+	uv sync --extra dev
 
 run-dev-build:
 	docker compose -f docker-compose-dev.yml up --build
 
 run-dev:
 	docker compose -f docker-compose-dev.yml up
+
+run-frontend:
+	docker compose -f docker-compose-dev.yml up frontend
+
+run-frontend-build:
+	docker compose -f docker-compose-dev.yml up --build frontend
+
+run-backend:
+	docker compose -f docker-compose-dev.yml up fastapi_server database redis_server caddy_reverse_proxy
+
+run-backend-build:
+	docker compose -f docker-compose-dev.yml up --build fastapi_server database redis_server caddy_reverse_proxy
 
 stop-dev:
 	docker compose -f docker-compose-dev.yml down
@@ -81,35 +100,29 @@ run-prod:
 stop-prod:
 	docker compose down
 
-create-celery-db:
-	if ! docker compose -f docker-compose-dev.yml exec database psql -U ${DATABASE_USER} -h localhost -lqt | cut -d \| -f 1 | grep -qw ${DATABASE_CELERY_NAME}; then \
-		docker compose -f docker-compose-dev.yml exec database createdb -U ${DATABASE_USER} -W ${DATABASE_PASSWORD} -h localhost -O ${DATABASE_USER} ${DATABASE_CELERY_NAME}; \
-	fi
-	
-
 init-db:
 	docker compose -f docker-compose-dev.yml exec fastapi_server python app/initial_data.py && \
 	echo "Initial data created." 
 
 formatter:
 	cd backend/app && \
-	poetry run black app
+	uv run black app
 
 lint:
 	cd backend/app && \
-	poetry run ruff app && poetry run black --check app
+	uv run ruff app && uv run black --check app
 
 mypy:
 	cd backend/app && \
-	poetry run mypy .
+	uv run mypy .
 
 lint-watch:
 	cd backend/app && \
-	poetry run ruff app --watch
+	uv run ruff app --watch
 
 lint-fix:
 	cd backend/app && \
-	poetry run ruff app --fix
+	uv run ruff app --fix
 
 run-sonarqube:
 	docker compose -f docker-compose-sonarqube.yml up

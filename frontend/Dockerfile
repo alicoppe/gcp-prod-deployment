@@ -1,6 +1,8 @@
 # Simple production build for the React + Vite + Tailwind frontend
 FROM node:20-alpine AS build
 WORKDIR /app
+ARG VITE_ASSET_BUCKET
+ENV VITE_ASSET_BUCKET=$VITE_ASSET_BUCKET
 COPY package.json package-lock.json* ./
 # Install deps (works whether lockfile exists or not)
 RUN npm install

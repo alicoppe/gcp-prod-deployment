@@ -1,0 +1,286 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_image_tag:
+        description: 'Backend image SHA (from dev build)'
+        required: true
+        type: string
+      frontend_image_tag:
+        description: 'Frontend image SHA (from dev build)'
+        required: true
+        type: string
+      skip_migrations:
+        description: 'Skip Alembic migrations'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  GCP_REGION: ${{ vars.GCP_REGION }}
+  ARTIFACT_REGISTRY: ${{ vars.ARTIFACT_REGISTRY }}
+  PROD_PROJECT_ID: ${{ vars.PROD_PROJECT_ID }}
+
+jobs:
+  # Terraform apply to prod
+  terraform-apply-prod:
+    runs-on: ubuntu-latest
+    environment: prod  # Requires manual approval in GitHub
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      backend_url: ${{ steps.outputs.outputs.backend_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PROD }}
+          service_account: ${{ vars.GCP_SA_TERRAFORM_PROD }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: |
+          cd infra/terraform/envs/prod
+          terraform init
+
+      - name: Terraform plan
+        run: |
+          cd infra/terraform/envs/prod
+          terraform plan \
+            -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ inputs.backend_image_tag }}" \
+            -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ inputs.frontend_image_tag }}"
+
+      - name: Terraform apply
+        run: |
+          cd infra/terraform/envs/prod
+          terraform apply -auto-approve \
+            -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ inputs.backend_image_tag }}" \
+            -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ inputs.frontend_image_tag }}"
+
+      - name: Get outputs
+        id: outputs
+        run: |
+          cd infra/terraform/envs/prod
+          BACKEND_URL=$(terraform output -raw backend_url)
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
+  # Run Alembic migrations against prod Cloud SQL
+  run-migrations-prod:
+    needs: terraform-apply-prod
+    if: ${{ !inputs.skip_migrations }}
+    runs-on: ubuntu-latest
+    environment: prod  # Reuse prod environment approval for migrations
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MODE: production
+      PROJECT_NAME: fastapi-sqlmodel-alembic
+      OPENAI_API_KEY: dummy
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      FIRST_SUPERUSER_EMAIL: admin@example.com
+      FIRST_SUPERUSER_PASSWORD: admin
+      WHEATER_URL: https://wttr.in
+      BACKEND_CORS_ORIGINS: http://localhost
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PROD }}
+          service_account: ${{ vars.GCP_SA_TERRAFORM_PROD }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          cd backend/app
+          uv sync --frozen --no-install-project
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+          chmod +x cloud_sql_proxy
+          ./cloud_sql_proxy -instances=${{ vars.PROD_SQL_INSTANCE_CONNECTION }}=tcp:5432 &
+          sleep 5
+
+      - name: Fetch DB password from Secret Manager
+        run: |
+          DB_PASSWORD=$(gcloud secrets versions access latest --secret="db-password" --project="${{ env.PROD_PROJECT_ID }}")
+          echo "DATABASE_USER=${{ vars.PROD_DB_USER }}" >> $GITHUB_ENV
+          echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> $GITHUB_ENV
+          echo "DATABASE_HOST=127.0.0.1" >> $GITHUB_ENV
+          echo "DATABASE_PORT=5432" >> $GITHUB_ENV
+          echo "DATABASE_NAME=${{ vars.PROD_DB_NAME }}" >> $GITHUB_ENV
+
+      - name: Extract Cloud SQL instance name
+        run: |
+          INSTANCE="${{ vars.PROD_SQL_INSTANCE_CONNECTION }}"
+          echo "DB_INSTANCE=${INSTANCE##*:}" >> $GITHUB_ENV
+
+      - name: Backup notification
+        continue-on-error: true
+        run: |
+          echo "Ensure a recent DB backup exists before proceeding"
+          gcloud sql backups list --instance="$DB_INSTANCE" --limit=1
+
+      - name: Run migrations
+        run: |
+          cd backend/app
+          uv run alembic upgrade head
+
+      - name: Verify migration
+        run: |
+          cd backend/app
+          uv run alembic current
+
+  # Smoke test prod deployment
+  smoke-test-prod:
+    needs: [terraform-apply-prod, run-migrations-prod]
+    if: always() && needs.terraform-apply-prod.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Health check
+        run: |
+          BACKEND_URL="${{ needs.terraform-apply-prod.outputs.backend_url }}"
+          curl -f "$BACKEND_URL/health" || exit 1
+          echo "Production deployment healthy"
+
+      - name: Notify success
+        run: |
+          echo "Production deployed successfully"
+          echo "Backend: ${{ needs.terraform-apply-prod.outputs.backend_url }}"
+
+  notify-prod-success:
+    needs: [terraform-apply-prod, smoke-test-prod]
+    if: always() && needs.smoke-test-prod.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Google Chat success notification
+        uses: SimonScholz/google-chat-action@main
+        with:
+          webhookUrl: ${{ secrets.GOOGLE_CHAT_WEBHOOK_PROD }}
+          jobStatus: success
+          title: "🎉 Production Deployment Successful"
+          subtitle: "All systems operational"
+          additionalSections: |
+            [
+              {
+                "header": "📦 Deployed",
+                "widgets": [
+                  {
+                    "decoratedText": {
+                      "topLabel": "Backend Image",
+                      "text": "${{ inputs.backend_image_tag }}"
+                    }
+                  },
+                  {
+                    "decoratedText": {
+                      "topLabel": "Frontend Image",
+                      "text": "${{ inputs.frontend_image_tag }}"
+                    }
+                  },
+                  {
+                    "decoratedText": {
+                      "topLabel": "Deployed By",
+                      "text": "${{ github.actor }}"
+                    }
+                  }
+                ]
+              },
+              {
+                "widgets": [
+                  {
+                    "buttonList": {
+                      "buttons": [
+                        {
+                          "text": "View Production",
+                          "onClick": {
+                            "openLink": {
+                              "url": "${{ needs.terraform-apply-prod.outputs.backend_url }}"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+
+  notify-prod-failure:
+    needs: [terraform-apply-prod, run-migrations-prod, smoke-test-prod]
+    if: always() && (needs.terraform-apply-prod.result == 'failure' || needs.run-migrations-prod.result == 'failure' || needs.smoke-test-prod.result == 'failure')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Google Chat failure alert
+        uses: SimonScholz/google-chat-action@main
+        with:
+          webhookUrl: ${{ secrets.GOOGLE_CHAT_WEBHOOK_PROD }}
+          jobStatus: failure
+          title: "🚨 Production Deployment FAILED"
+          subtitle: "<users/all> Immediate action required"
+          # mention: "<users/all>"
+          additionalSections: |
+            [
+              {
+                "header": "❌ Failed Stage",
+                "widgets": [
+                  {
+                    "decoratedText": {
+                      "topLabel": "Terraform",
+                      "text": "${{ needs.terraform-apply-prod.result }}"
+                    }
+                  },
+                  {
+                    "decoratedText": {
+                      "topLabel": "Migrations",
+                      "text": "${{ needs.run-migrations-prod.result }}"
+                    }
+                  },
+                  {
+                    "decoratedText": {
+                      "topLabel": "Smoke Test",
+                      "text": "${{ needs.smoke-test-prod.result }}"
+                    }
+                  }
+                ]
+              },
+              {
+                "widgets": [
+                  {
+                    "buttonList": {
+                      "buttons": [
+                        {
+                          "text": "View Failure Logs",
+                          "onClick": {
+                            "openLink": {
+                              "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]

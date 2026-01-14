@@ -7,3 +7,14 @@ variable "allowed_origins" {
   type    = list(string)
   default = ["http://fastapi.localhost", "http://app.localhost"]
 }
+
+variable "vertex_ai_quota_overrides" {
+  type = list(object({
+    service        = string
+    metric         = string
+    limit          = string
+    override_value = string
+    dimensions     = map(string)
+  }))
+  default = []
+}
