@@ -20,3 +20,37 @@ variable "labels" {
   type    = map(string)
   default = {}
 }
+
+variable "backend_cpu" {
+  type    = string
+  default = "1"
+}
+variable "backend_memory" {
+  type    = string
+  default = "512Mi"
+}
+variable "backend_min_instances" {
+  type    = number
+  default = 0
+}
+variable "backend_max_instances" {
+  type    = number
+  default = 1
+}
+
+variable "frontend_cpu" {
+  type    = string
+  default = "1"
+}
+variable "frontend_memory" {
+  type    = string
+  default = "512Mi"
+}
+variable "frontend_min_instances" {
+  type    = number
+  default = 0
+}
+variable "frontend_max_instances" {
+  type    = number
+  default = 1
+}

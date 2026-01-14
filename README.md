@@ -6,7 +6,7 @@ This repo is a **full-stack starter** pairing a FastAPI backend (async SQLModel 
 - **Backend**: FastAPI (async), SQLModel, Alembic, JWT auth, Redis-backed cache/rate limits.
 - **Frontend**: React + Vite + Tailwind placeholder wired to the API via Caddy locally and Cloud Run in prod.
 - **Storage**: Local filesystem in dev; Google Cloud Storage with signed URLs in prod.
-- **Background / Scheduling**: Cloud Scheduler → Pub/Sub → backend push handler (no Celery in prod).
+- **Background / Scheduling**: Cloud Scheduler → Pub/Sub → backend push handler.
 - **Infra as Code**: Terraform modules for Cloud Run, Cloud SQL (Postgres), Memorystore (Redis), GCS bucket, Pub/Sub, Scheduler, Artifact Registry.
 - **CI/CD**: GitHub Actions workflow that plans on PRs and applies on `main` using Workload Identity Federation.
 
@@ -32,7 +32,8 @@ This repo is a **full-stack starter** pairing a FastAPI backend (async SQLModel 
 ## Prerequisites
 - Docker + Docker Compose
 - Make (optional shortcuts)
-- Python 3.10+ if running backend directly
+- Python 3.11+ if running backend directly
+- uv (for backend dependency management)
 - Node 20+ if running frontend directly
 
 ## Local Development
@@ -40,17 +41,41 @@ Run the stack (dev):
 ```sh
 docker compose -f docker-compose-dev.yml up --build
 ```
+Quick workflows (Makefile):
+```sh
+# Full dev stack
+make run-dev            # first time or after Dockerfile/dep changes: make run-dev-build
+
+# Backend-only (API + DB + Redis + Caddy)
+make run-backend        # first time or after Dockerfile/dep changes: make run-backend-build
+
+# Frontend-only
+make run-frontend        # first time or after Dockerfile/dep changes: make run-frontend-build
+
+# Tests (stack + pytest)
+make run-test
+make pytest
+
+# pgAdmin (optional DB UI)
+make run-pgadmin
+```
 Services (dev):
 - FastAPI: http://fastapi.localhost/docs
 - Frontend: http://app.localhost
 - Static files: http://static.localhost
 - Postgres: mapped to localhost:5454
 
+.env tips for local:
+- You can keep most defaults as-is for local dev.
+- `DATABASE_HOST` must stay `database` and `REDIS_HOST` must stay `redis_server` when using Docker Compose.
+- It’s best to change `SECRET_KEY`, `ENCRYPT_KEY`, and the admin credentials even for local work, but defaults will still run.
+- Only set `OPENAI_API_KEY`, `VERTEX_*`, or `GCS_*` if you plan to use those services locally.
+
 Hot reload:
 - Backend: Uvicorn `--reload`
 - Frontend: Vite dev server
 
-Testing “periodic” work locally (replaces Celery):
+Testing “periodic” work locally:
 ```sh
 curl -X POST http://fastapi.localhost/api/v1/pubsub/push \
   -H "Content-Type: application/json" \
@@ -84,7 +109,25 @@ echo -n "YOUR_STRONG_DB_PASSWORD" | gcloud secrets versions add db-password --da
 
 Terraform loads this secret directly (see `envs/dev|prod/main.tf` data source), so you don't need to keep the DB password in tfvars.
 
-3) Fill per-env tfvars (git-ignored):
+3) Enable required APIs (one-time per project):
+```sh
+gcloud services enable cloudresourcemanager.googleapis.com \
+  --project <PROJECT_ID>
+gcloud services enable sqladmin.googleapis.com \
+  --project <PROJECT_ID>
+```
+
+4) Create the app asset buckets (pre-created, referenced by Terraform):
+```sh
+# Dev bucket
+gcloud storage buckets create gs://app-frontend-dev --location=us-central1 --uniform-bucket-level-access
+
+# Prod bucket
+gcloud storage buckets create gs://app-frontend-prod --location=us-central1 --uniform-bucket-level-access
+```
+These buckets are **referenced** by Terraform (not created) because `create_bucket = false` is set in `infra/terraform/envs/*/main.tf`.
+
+5) Fill per-env tfvars (git-ignored):
 - `infra/terraform/envs/dev/terraform.tfvars`
 - `infra/terraform/envs/prod/terraform.tfvars`
 
@@ -94,7 +137,7 @@ Set:
 - `backend_image` / `frontend_image` (Artifact Registry URLs)
 - Optional: `allowed_origins`
 
-4) Lock down the Terraform state buckets (example commands with your project IDs)
+6) Lock down the Terraform state buckets (example commands with your project IDs)
 ```sh
 # Enable uniform bucket-level access and versioning
 gsutil uniformbucketlevelaccess set on gs://tf-state-dev-deployment-483516
@@ -131,7 +174,16 @@ Create secrets (examples):
 gcloud secrets create db-password --replication-policy=automatic
 echo -n "your-db-password" | gcloud secrets versions add db-password --data-file=-
 ```
+Important: the secret **must** have at least one version. If you created the secret without adding a version, Terraform will fail with “secret not found or has no versions.”
 Do likewise for `secret-key`, `encrypt-key`, `openai-key`, etc. Keep values out of git and TF state. Best practice: mount secrets into Cloud Run via secret env vars (module can be extended) or set runtime envs manually after deploy. Note: the DB password is read from Secret Manager by Terraform (`data "google_secret_manager_secret_version"`), so it does not need to live in tfvars.
+
+Grant the Terraform service account access to `db-password` in both dev and prod projects:
+```sh
+gcloud secrets add-iam-policy-binding db-password \
+  --project <PROJECT_ID> \
+  --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
+  --role="roles/secretmanager.secretAccessor"
+```
 
 ## Terraform Layout & Apply
 Structure:
@@ -142,8 +194,8 @@ Structure:
 Fill in (per env `terraform.tfvars`, not committed):
 - `project_id`, `region`, `vertex_region`
 - `backend_image`, `frontend_image` (Artifact Registry URLs)
-- `db_password` (sensitive)
 - `allowed_origins` if overriding defaults
+- Optional: `vertex_ai_quota_overrides` (see Cost Controls section)
 
 Run:
 ```sh
@@ -153,6 +205,66 @@ terraform plan -var-file=terraform.tfvars
 terraform apply
 ```
 Repeat for prod.
+
+## Initial Cloud SQL Bootstrap (Local, No JSON Keys)
+If you want the **Cloud SQL instance created before GitHub Actions runs**, you can apply only the SQL module locally using **service account impersonation**. This keeps state in the same Terraform bucket and avoids storing a JSON key.
+
+Why do it this way:
+- No long-lived JSON keys.
+- The SQL instance is written into **Terraform state** (same GCS backend), so CI won’t recreate it.
+- Lets you validate Terraform locally before handing off to GitHub Actions.
+
+### Prereqs
+- Your user can impersonate the Terraform service account:
+  ```sh
+  gcloud iam service-accounts add-iam-policy-binding <TERRAFORM_SA_EMAIL> \
+    --member="user:<YOUR_EMAIL>" \
+    --role="roles/iam.serviceAccountTokenCreator" \
+    --project <PROJECT_ID>
+  ```
+- IAM Credentials API enabled:
+  ```sh
+  gcloud services enable iamcredentials.googleapis.com --project <PROJECT_ID>
+  ```
+
+### Dev example
+```sh
+PROJECT_ID=dev-deployment-483516
+TERRAFORM_SA=terraform-dev@dev-deployment-483516.iam.gserviceaccount.com
+
+gcloud auth login
+gcloud auth application-default login
+gcloud auth application-default set-quota-project $PROJECT_ID
+export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=$TERRAFORM_SA
+
+cd infra/terraform/envs/dev
+terraform init -reconfigure
+terraform apply -var-file=terraform.tfvars -target=module.sql -target=module.artifact_registry
+```
+
+### Prod example
+```sh
+PROJECT_ID=prod-deployment-483516
+TERRAFORM_SA=terraform-prod@prod-deployment-483516.iam.gserviceaccount.com
+
+gcloud auth login
+gcloud auth application-default login
+gcloud auth application-default set-quota-project $PROJECT_ID
+export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=$TERRAFORM_SA
+
+cd infra/terraform/envs/prod
+terraform init -reconfigure
+terraform apply -var-file=terraform.tfvars -target=module.sql -target=module.artifact_registry
+```
+
+### After SQL is created
+Add these GitHub Variables so workflows can run migrations via Cloud SQL Proxy:
+- `DEV_SQL_INSTANCE_CONNECTION`
+- `PROD_SQL_INSTANCE_CONNECTION`
+- `DEV_DB_USER`
+- `DEV_DB_NAME`
+- `PROD_DB_USER`
+- `PROD_DB_NAME`
 
 ## Production on Google Cloud
 Managed services used:
@@ -176,7 +288,7 @@ Deploy flow:
 
 ## Background Jobs: Scheduler & Pub/Sub
 - Periodic work: Cloud Scheduler → Pub/Sub → push to backend `/api/v1/pubsub/push`.
-- No Celery/Beat in prod; local dev hits the same endpoint manually.
+- No worker service in prod; local dev hits the same endpoint manually.
 
 ## File Storage
 - Dev: local `static/uploads` (public via Caddy static host).
@@ -196,27 +308,73 @@ Deploy flow:
   - `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test)
   - `deploy-prod.yml`: manual prod deploy with GitHub Environment approvals
 
+### Workload Identity Federation (DEV/PROD)
+Use Workload Identity Federation (WIF) so GitHub Actions can authenticate to GCP without long-lived service account keys. The following example shows how to create the **dev** pool and provider and output the resource name for the GitHub secret. Repeat for **prod** with a different pool name (e.g. `github-actions-prod`) and prod project/service account.
+
+```bash
+PROJECT_ID=
+SERVICE_ACCOUNT=
+GITHUB_REPO=
+
+gcloud config set project "$PROJECT_ID"
+
+# Get project number
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" \
+  --format="value(projectNumber)")
+
+# 1) Create Workload Identity Pool (idempotent; will error if it already exists)
+gcloud iam workload-identity-pools create "github-actions-dev" \
+  --location="global" \
+  --display-name="GitHub Actions Dev"
+
+# 2) Create OIDC provider for GitHub with attribute mapping + condition
+gcloud iam workload-identity-pools providers create-oidc "github" \
+  --workload-identity-pool="github-actions-dev" \
+  --location="global" \
+  --display-name="GitHub OIDC" \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
+  --attribute-condition="attribute.repository=='${GITHUB_REPO}'"
+
+# 3) Allow this pool (for this repo) to impersonate the dev Terraform SA
+gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-dev/attribute.repository/${GITHUB_REPO}"
+
+# 4) Print provider resource name for GitHub secret
+echo "GCP_WIF_PROVIDER_DEV=projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-dev/providers/github"
+```
+
 ### Required GitHub Secrets
 Set these in Settings -> Secrets and variables -> Actions.
 
+Repository variables (non-secret)
+- GCP_REGION (example: us-central1)
+- ARTIFACT_REGISTRY (example: us-central1-docker.pkg.dev)
+- DEV_PROJECT_ID
+- PROD_PROJECT_ID
+- VITE_ASSET_BUCKET (asset bucket name baked into the frontend build)
+- GCP_WIF_PROVIDER_DEV
+- GCP_WIF_PROVIDER_PROD
+- GCP_SA_TERRAFORM_DEV
+- GCP_SA_TERRAFORM_PROD
+- DEV_SQL_INSTANCE_CONNECTION
+- PROD_SQL_INSTANCE_CONNECTION
+ - DEV_DB_USER
+ - DEV_DB_NAME
+ - PROD_DB_USER
+ - PROD_DB_NAME
+If you want different buckets per env, use Environment-level variables or duplicate the build step to pass a different value for prod.
+
 Repository secrets (shared)
-- GCP_WIF_PROVIDER_DEV: Workload Identity Provider for dev
-- GCP_WIF_PROVIDER_PROD: Workload Identity Provider for prod
-- GCP_SA_CI_DEV: Service account for building/pushing images (dev)
-- GCP_SA_TERRAFORM_DEV: Service account for Terraform (dev)
-- GCP_SA_MIGRATION_DEV: Service account for migrations (dev)
-- DEV_SQL_INSTANCE_CONNECTION: project:region:instance
-- DEV_DATABASE_URL: postgresql+psycopg2://user:pass@127.0.0.1:5432/db
 - GOOGLE_CHAT_WEBHOOK_DEV
 
 Environment secrets (prod)
-- GCP_SA_TERRAFORM_PROD
-- GCP_SA_MIGRATION_PROD
-- PROD_SQL_INSTANCE_CONNECTION
-- PROD_DATABASE_URL
 - GOOGLE_CHAT_WEBHOOK_PROD
 
-Also update `DEV_PROJECT_ID` and `PROD_PROJECT_ID` in the deploy workflows (or replace them with repository variables) to match your GCP projects.
+Store non-sensitive values above as GitHub Variables, not secrets.
+Note: You can split service accounts by role (CI build vs Terraform vs migrations) for least privilege, but this repo now uses the Terraform service account for all steps per environment.
+Migrations now fetch the DB password from GCP Secret Manager (`db-password`). Ensure the Terraform service account has `roles/secretmanager.secretAccessor` on that secret in both dev and prod.
 
 ### GitHub Environment setup for prod
 1) Go to Settings -> Environments -> New environment -> name it `prod`.
@@ -280,13 +438,39 @@ Deploy to prod:
 ```
 
 ## Per-Resource Knobs
-- Cloud SQL: `tier`, `high_availability`, `deletion_protection`, user/password in env root `main.tf`.
-- Redis: `tier` (BASIC/STD_HA), `memory_size_gb`. Without a VPC connector, use a public Redis endpoint instead of Memorystore.
-- Cloud Run: CORS origins, images, env vars; `vpc_connector` currently `null`. Add min/max instances or secret envs if desired.
+- Cloud SQL: in `infra/terraform/envs/*/main.tf` → `module "sql"`:
+  - `tier` (instance size), `high_availability`, `deletion_protection`.
+- Redis: in `infra/terraform/envs/*/main.tf` → `module "redis"`:
+  - `tier` (BASIC/STD_HA), `memory_size_gb`.
+- Cloud Run: in `infra/terraform/envs/*/main.tf` → `module "cloud_run"`:
+  - `backend_cpu`, `backend_memory`, `backend_min_instances`, `backend_max_instances`.
+  - `frontend_cpu`, `frontend_memory`, `frontend_min_instances`, `frontend_max_instances`.
+  - `cors_origins`, `vpc_connector`.
 - Storage: bucket names (`app-frontend-dev/prod`), `force_destroy` flag.
 - Scheduler: cron (`schedule`), payload JSON, time zone.
 - Artifact Registry: repo id/region if you change from `app` / `us-central1`.
 - State: backend bucket names in `infra/terraform/envs/*/main.tf`.
+
+## Cost Controls (Recommended)
+You can cap autoscaling costs in Terraform and add quota/budget protections in GCP:
+
+- **Cloud Run scaling caps (Terraform)**: `backend_max_instances` and `frontend_max_instances` are wired in `infra/terraform/envs/*/main.tf`. Cloud Run max instances is a built-in cost control.
+- **Cloud Run warm instances**: `*_min_instances` controls how many instances stay warm (default is 0).
+- **Vertex AI quotas (Terraform, optional)**: set `vertex_ai_quota_overrides` in your `terraform.tfvars` to apply consumer quota overrides for `aiplatform.googleapis.com`. This repo includes a `google_service_usage_consumer_quota_override` resource in both dev/prod envs. Use the Vertex AI quotas page to identify the exact metric/limit names for your region and feature.
+- **Budgets & alerts (GCP)**: budgets send alerts and Pub/Sub notifications but do **not** hard-cap spend. Use them to trigger automation if needed.
+
+Example `terraform.tfvars` override (replace metric/limit with values from the Quotas page):
+```hcl
+vertex_ai_quota_overrides = [
+  {
+    service        = "aiplatform.googleapis.com"
+    metric         = "aiplatform.googleapis.com/online_prediction_requests"
+    limit          = "aiplatform.googleapis.com/online_prediction_requests_per_minute"
+    override_value = "60"
+    dimensions     = { region = "us-central1" }
+  }
+]
+```
 
 ## Infra Breakdown
 - Cloud Run (backend & frontend, v2): serves API and React app; envs include DB URL, Redis host/port, GCS bucket, CORS, Vertex project/region.

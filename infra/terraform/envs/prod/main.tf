@@ -44,10 +44,10 @@ module "sql" {
   db_name            = "app"
   db_user            = "app_user"
   db_password        = data.google_secret_manager_secret_version.db_password.secret_data
-  tier               = "db-custom-2-7680"
+  tier               = "db-f1-micro"
   labels             = local.labels
-  high_availability  = true
-  deletion_protection = true
+  high_availability  = false
+  deletion_protection = false
 }
 
 module "redis" {
@@ -56,7 +56,7 @@ module "redis" {
   region         = var.region
   name           = "app-redis-prod"
   memory_size_gb = 1
-  tier           = "STANDARD_HA"
+  tier           = "BASIC"
   labels         = local.labels
 }
 
@@ -67,6 +67,7 @@ module "storage" {
   bucket_name = "app-frontend-prod"
   labels      = local.labels
   force_destroy = false
+  create_bucket = false
 }
 
 module "cloud_run" {
@@ -85,6 +86,14 @@ module "cloud_run" {
   cors_origins         = var.allowed_origins
   vpc_connector        = null
   labels               = local.labels
+  backend_cpu          = "1"
+  backend_memory       = "512Mi"
+  backend_min_instances = 0
+  backend_max_instances = 1
+  frontend_cpu         = "1"
+  frontend_memory      = "512Mi"
+  frontend_min_instances = 0
+  frontend_max_instances = 1
 }
 
 module "pubsub_scheduler" {
@@ -107,4 +116,20 @@ module "secret_access" {
   source           = "../../modules/iam_secret_access"
   project_id       = var.project_id
   backend_sa_email = module.cloud_run.backend_service_account
+}
+
+resource "google_service_usage_consumer_quota_override" "vertex_ai" {
+  provider = google-beta
+  for_each = {
+    for override in var.vertex_ai_quota_overrides :
+    "${override.service}:${override.metric}:${override.limit}:${join(",", sort(keys(override.dimensions)))}" => override
+  }
+
+  project        = var.project_id
+  service        = each.value.service
+  metric         = urlencode(each.value.metric)
+  limit          = urlencode(each.value.limit)
+  override_value = each.value.override_value
+  force          = true
+  dimensions     = each.value.dimensions
 }

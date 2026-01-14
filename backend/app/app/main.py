@@ -18,8 +18,6 @@ from fastapi_cache.backends.redis import RedisBackend
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import WebSocketRateLimiter
 from jwt import DecodeError, ExpiredSignatureError, MissingRequiredClaimError
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage
 from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
 from starlette.middleware.cors import CORSMiddleware
 from transformers import pipeline
@@ -29,8 +27,10 @@ from app.api.deps import get_redis_client
 from app.api.v1.api import api_router as api_router_v1
 from app.core.config import ModeEnum, settings
 from app.core.security import decode_token
+from app.schemas.chat_schema import ChatRoleEnum
 from app.schemas.common_schema import IChatResponse, IUserMessage
 from app.utils.fastapi_globals import GlobalsMiddleware, g
+from app.utils.llm_client import ChatClient
 from app.utils.uuid6 import uuid7
 
 
@@ -93,6 +93,7 @@ async def lifespan(app: FastAPI):
         ),
     }
     g.set_default("sentiment_model", models["sentiment_model"])
+    g.set_default("chat_client", ChatClient())
     print("startup fastapi")
     yield
     # shutdown
@@ -170,8 +171,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: UUID):
     await websocket.accept()
     redis_client = await get_redis_client()
     ws_ratelimit = WebSocketRateLimiter(times=200, hours=24)
-    chat = ChatOpenAI(temperature=0, openai_api_key=settings.OPENAI_API_KEY)
-    chat_history = []
+    chat_client = g.chat_client
+    current_session_id: UUID | None = None
 
     async with db():
         user = await crud.user.get_by_id_active(id=user_id)
@@ -190,6 +191,37 @@ async def websocket_endpoint(websocket: WebSocket, user_id: UUID):
                 await ws_ratelimit(websocket)
                 user_message = IUserMessage.model_validate(data)
                 user_message.user_id = user_id
+                requested_session_id = user_message.session_id
+
+                async with db():
+                    if requested_session_id is not None:
+                        session = await crud.chat_session.get(id=requested_session_id)
+                        if session is None or session.user_id != user_id:
+                            await websocket.send_json(
+                                IChatResponse(
+                                    sender="bot",
+                                    message="Invalid or unauthorized chat session.",
+                                    type="error",
+                                    message_id="",
+                                    id="",
+                                ).dict()
+                            )
+                            continue
+                        current_session_id = requested_session_id
+
+                    if current_session_id is None:
+                        session_title = user_message.message.strip()[:60]
+                        session = await crud.chat_session.create_for_user(
+                            user_id=user_id, title=session_title
+                        )
+                        current_session_id = session.id
+
+                    await crud.chat_message.create_for_session(
+                        session_id=current_session_id,
+                        user_id=user_id,
+                        role=ChatRoleEnum.user,
+                        content=user_message.message,
+                    )
 
                 resp = IChatResponse(
                     sender="you",
@@ -197,24 +229,37 @@ async def websocket_endpoint(websocket: WebSocket, user_id: UUID):
                     type="stream",
                     message_id=str(uuid7()),
                     id=str(uuid7()),
+                    session_id=current_session_id,
                 )
                 await websocket.send_json(resp.dict())
 
                 # # Construct a response
                 start_resp = IChatResponse(
-                    sender="bot", message="", type="start", message_id="", id=""
+                    sender="bot",
+                    message="",
+                    type="start",
+                    message_id="",
+                    id="",
+                    session_id=current_session_id,
                 )
                 await websocket.send_json(start_resp.dict())
 
-                result = chat([HumanMessage(content=resp.message)])
-                chat_history.append((user_message.message, result.content))
+                result_text = chat_client.generate(resp.message)
+                async with db():
+                    await crud.chat_message.create_for_session(
+                        session_id=current_session_id,
+                        user_id=None,
+                        role=ChatRoleEnum.assistant,
+                        content=result_text,
+                    )
 
                 end_resp = IChatResponse(
                     sender="bot",
-                    message=result.content,
+                    message=result_text,
                     type="end",
                     message_id=str(uuid7()),
                     id=str(uuid7()),
+                    session_id=current_session_id,
                 )
                 await websocket.send_json(end_resp.dict())
             except WebSocketDisconnect:

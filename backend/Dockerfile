@@ -2,19 +2,20 @@ FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV PIP_DEFAULT_TIMEOUT=100
 WORKDIR /code
-# Install Poetry
-RUN apt clean && apt update && apt install curl -y
-RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \
-    cd /usr/local/bin && \
-    ln -s /opt/poetry/bin/poetry && \
-    poetry config virtualenvs.create false
 
-# Copy poetry.lock* in case it doesn't exist in the repo
-COPY app/pyproject.toml app/poetry.lock* /code/
+# Install uv
+RUN pip install --no-cache-dir uv
+
+# Copy dependency metadata
+COPY app/pyproject.toml app/uv.lock /code/
+
+# Use the project venv created by uv sync
+ENV VIRTUAL_ENV=/code/.venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Allow installing dev dependencies to run tests
 ARG INSTALL_DEV=false
-RUN bash -c "if [ $INSTALL_DEV == 'true' ] ; then poetry install --no-root ; else poetry install --no-root --only main ; fi"
+RUN bash -c "if [ \"$INSTALL_DEV\" = 'true' ] ; then uv sync --frozen --extra dev --no-install-project ; else uv sync --frozen --no-install-project ; fi"
 
 ENV PYTHONPATH=/code
 EXPOSE 8000

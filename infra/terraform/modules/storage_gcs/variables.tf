@@ -1,6 +1,10 @@
 variable "project_id" { type = string }
 variable "location"   { type = string }
 variable "bucket_name" { type = string }
+variable "create_bucket" {
+  type    = bool
+  default = true
+}
 variable "force_destroy" {
   type    = bool
   default = true

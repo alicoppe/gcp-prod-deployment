@@ -4,6 +4,7 @@ resource "google_project_service" "storage_api" {
 }
 
 resource "google_storage_bucket" "bucket" {
+  count                       = var.create_bucket ? 1 : 0
   name                        = var.bucket_name
   project                     = var.project_id
   location                    = var.location
@@ -16,4 +17,10 @@ resource "google_storage_bucket" "bucket" {
   }
 
   depends_on = [google_project_service.storage_api]
+}
+
+data "google_storage_bucket" "existing" {
+  count  = var.create_bucket ? 0 : 1
+  name   = var.bucket_name
+  project = var.project_id
 }
