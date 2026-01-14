@@ -55,6 +55,9 @@ jobs:
         run: |
           cd infra/terraform/envs/prod
           terraform plan \
+            -var="project_id=${{ env.PROD_PROJECT_ID }}" \
+            -var="region=${{ env.GCP_REGION }}" \
+            -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
             -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ inputs.backend_image_tag }}" \
             -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ inputs.frontend_image_tag }}"
 
@@ -62,6 +65,9 @@ jobs:
         run: |
           cd infra/terraform/envs/prod
           terraform apply -auto-approve \
+            -var="project_id=${{ env.PROD_PROJECT_ID }}" \
+            -var="region=${{ env.GCP_REGION }}" \
+            -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
             -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ inputs.backend_image_tag }}" \
             -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ inputs.frontend_image_tag }}"
 
