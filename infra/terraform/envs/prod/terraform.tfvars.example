@@ -1,0 +1,5 @@
+project_id     = "prod-deployment-<project-id>"
+region         = "us-central1"
+vertex_region  = "us-central1"
+backend_image  = "us-central1-docker.pkg.dev/prod-deployment-<project-id>/app/backend:prod"
+frontend_image = "us-central1-docker.pkg.dev/prod-deployment-<project-id>/app/frontend:prod"
