@@ -27,13 +27,13 @@ class LocalStorageClient:
         file_name: str,
         content_type: Optional[str] = None,  # noqa: ARG002 - kept for API parity
     ) -> IStorageResponse:
-        object_name = f\"{uuid7()}{file_name}\"
+        object_name = f"{uuid7()}{file_name}"
         target = self.base_path / object_name
-        with target.open(\"wb\") as f:
+        with target.open("wb") as f:
             f.write(file_data.getbuffer())
 
-        url = f\"{self.public_base}/{object_name}\"
+        url = f"{self.public_base}/{object_name}"
         return IStorageResponse(bucket_name=None, file_name=object_name, url=url)
 
     def get_url(self, object_name: str) -> str:
-        return f\"{self.public_base}/{object_name}\"
+        return f"{self.public_base}/{object_name}"
