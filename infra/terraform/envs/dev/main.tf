@@ -5,6 +5,8 @@ terraform {
   }
 }
 
+# ci: trigger terraform checks
+
 locals {
   labels = {
     env = "dev"
