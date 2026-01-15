@@ -129,11 +129,13 @@ jobs:
       - name: Fetch DB password from Secret Manager
         run: |
           DB_PASSWORD=$(gcloud secrets versions access latest --secret="db-password" --project="${{ env.PROD_PROJECT_ID }}")
+          ENCRYPT_KEY=$(gcloud secrets versions access latest --secret="encrypt-key" --project="${{ env.PROD_PROJECT_ID }}")
           echo "DATABASE_USER=${{ vars.PROD_DB_USER }}" >> $GITHUB_ENV
           echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> $GITHUB_ENV
           echo "DATABASE_HOST=127.0.0.1" >> $GITHUB_ENV
           echo "DATABASE_PORT=5432" >> $GITHUB_ENV
           echo "DATABASE_NAME=${{ vars.PROD_DB_NAME }}" >> $GITHUB_ENV
+          echo "ENCRYPT_KEY=${ENCRYPT_KEY}" >> $GITHUB_ENV
 
       - name: Extract Cloud SQL instance name
         run: |

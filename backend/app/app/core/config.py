@@ -6,6 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Any
 import secrets
 from enum import Enum
+from cryptography.fernet import Fernet
+
+
+def _default_encrypt_key() -> str:
+    return Fernet.generate_key().decode()
 
 
 class ModeEnum(str, Enum):
@@ -64,8 +69,27 @@ class Settings(BaseSettings):
     WHEATER_URL: AnyHttpUrl
 
     SECRET_KEY: str = secrets.token_urlsafe(32)
-    ENCRYPT_KEY: str = secrets.token_urlsafe(32)
+    ENCRYPT_KEY: str = _default_encrypt_key()
     BACKEND_CORS_ORIGINS: list[str] | list[AnyHttpUrl]
+
+    @field_validator("ENCRYPT_KEY", mode="before")
+    def validate_encrypt_key(cls, v: str | None) -> str:
+        if v is None:
+            return _default_encrypt_key()
+        if isinstance(v, bytes):
+            v = v.decode()
+        if not isinstance(v, str):
+            raise ValueError("ENCRYPT_KEY must be a string")
+        value = v.strip()
+        if not value:
+            return _default_encrypt_key()
+        try:
+            Fernet(value.encode())
+        except Exception as exc:
+            raise ValueError(
+                "ENCRYPT_KEY must be a valid Fernet key (32 url-safe base64-encoded bytes)"
+            ) from exc
+        return value
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def assemble_cors_origins(

@@ -41,8 +41,6 @@ jobs:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
           POSTGRES_DB: test
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -51,8 +49,6 @@ jobs:
 
       redis:
         image: redis:7-alpine
-        ports:
-          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -63,12 +59,13 @@ jobs:
       MODE: testing
       PROJECT_NAME: fastapi-sqlmodel-alembic
       OPENAI_API_KEY: test
+      ENCRYPT_KEY: ${{ secrets.ENCRYPT_KEY_TEST }}
       DATABASE_USER: test
       DATABASE_PASSWORD: test
-      DATABASE_HOST: localhost
+      DATABASE_HOST: postgres
       DATABASE_PORT: 5432
       DATABASE_NAME: test
-      REDIS_HOST: localhost
+      REDIS_HOST: redis
       REDIS_PORT: 6379
       FIRST_SUPERUSER_EMAIL: admin@example.com
       FIRST_SUPERUSER_PASSWORD: admin
@@ -124,8 +121,6 @@ jobs:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
           POSTGRES_DB: test
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -136,12 +131,13 @@ jobs:
       MODE: testing
       PROJECT_NAME: fastapi-sqlmodel-alembic
       OPENAI_API_KEY: test
+      ENCRYPT_KEY: ${{ secrets.ENCRYPT_KEY_TEST }}
       DATABASE_USER: test
       DATABASE_PASSWORD: test
-      DATABASE_HOST: localhost
+      DATABASE_HOST: postgres
       DATABASE_PORT: 5432
       DATABASE_NAME: test
-      REDIS_HOST: localhost
+      REDIS_HOST: redis
       REDIS_PORT: 6379
       FIRST_SUPERUSER_EMAIL: admin@example.com
       FIRST_SUPERUSER_PASSWORD: admin
@@ -216,9 +212,17 @@ jobs:
 
   # Terraform plan for dev
   terraform-plan-dev:
-    needs: changes
-    if: needs.changes.outputs.infra == 'true'
+    needs: [changes, backend-tests, frontend-tests, migrations-check]
+    if: |
+      needs.changes.outputs.infra == 'true' &&
+      !github.event.act &&
+      (needs.backend-tests.result == 'success' || needs.backend-tests.result == 'skipped') &&
+      (needs.frontend-tests.result == 'success' || needs.frontend-tests.result == 'skipped') &&
+      (needs.migrations-check.result == 'success' || needs.migrations-check.result == 'skipped')
     runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-plan-dev
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -245,7 +249,7 @@ jobs:
         id: plan
         run: |
           cd infra/terraform/envs/dev
-          terraform plan -no-color -out=tfplan
+          terraform plan -no-color -out=tfplan -lock-timeout=5m
         continue-on-error: true
 
       - name: Post plan to PR
