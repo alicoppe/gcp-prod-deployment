@@ -487,3 +487,5 @@ vertex_ai_quota_overrides = [
 
 ## License
 This project is licensed under the terms of the MIT license. See [LICENSE](LICENSE) for details.
+
+Successful merge!
