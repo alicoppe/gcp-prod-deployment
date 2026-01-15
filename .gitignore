@@ -51,6 +51,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+.github/act/secrets
+
 # Translations
 *.mo
 *.pot
