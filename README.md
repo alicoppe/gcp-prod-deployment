@@ -321,9 +321,9 @@ Deploy flow:
 ## CI/CD
 - GitHub Actions workflows:
 - `ci.yml`: PR validation (backend tests, migrations check, frontend build; Terraform plan runs after these succeed)
-- `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test) and supports manual `workflow_dispatch`. If build steps are skipped, it attempts to deploy images tagged with the current commit SHA; if they don't exist, the workflow fails with a clear error.
+- `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test) and supports manual `workflow_dispatch`. Infra changes also trigger backend/frontend image rebuilds to avoid manual image selection.
 - `deploy-prod.yml`: manual prod deploy with GitHub Environment approvals
-  - deploys images tagged with the current commit SHA and validates those tags exist before applying.
+  - builds and pushes backend/frontend images for the current commit SHA, then deploys them.
 
 ### Local CI with act
 To test `ci.yml` locally before opening a PR:
@@ -386,7 +386,8 @@ Repository variables (non-secret)
 - ARTIFACT_REGISTRY (example: us-central1-docker.pkg.dev)
 - DEV_PROJECT_ID
 - PROD_PROJECT_ID
-- VITE_ASSET_BUCKET (asset bucket name baked into the frontend build)
+- VITE_ASSET_BUCKET (dev asset bucket name baked into the frontend build)
+- VITE_ASSET_BUCKET_PROD (prod asset bucket name baked into the frontend build)
 - GCP_WIF_PROVIDER_DEV
 - GCP_WIF_PROVIDER_PROD
 - GCP_SA_TERRAFORM_DEV
