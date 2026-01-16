@@ -58,6 +58,18 @@ resource "google_cloud_run_v2_service" "backend" {
         name  = "BACKEND_CORS_ORIGINS"
         value = join(",", var.cors_origins)
       }
+      dynamic "env" {
+        for_each = var.encrypt_key_secret_name == null || var.encrypt_key_secret_name == "" ? [] : [var.encrypt_key_secret_name]
+        content {
+          name = "ENCRYPT_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = env.value
+              version = "latest"
+            }
+          }
+        }
+      }
       env {
         name  = "VERTEX_PROJECT_ID"
         value = var.vertex_project_id

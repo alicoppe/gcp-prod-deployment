@@ -41,6 +41,10 @@ Run the stack (dev):
 ```sh
 docker compose -f docker-compose-dev.yml up --build
 ```
+Local CI checks with `act` (skips Terraform plan):
+```sh
+make ci-local
+```
 Quick workflows (Makefile):
 ```sh
 # Full dev stack
@@ -68,7 +72,8 @@ Services (dev):
 .env tips for local:
 - You can keep most defaults as-is for local dev.
 - `DATABASE_HOST` must stay `database` and `REDIS_HOST` must stay `redis_server` when using Docker Compose.
-- It’s best to change `SECRET_KEY`, `ENCRYPT_KEY`, and the admin credentials even for local work, but defaults will still run.
+- It’s best to change `SECRET_KEY`, `ENCRYPT_KEY`, and the admin credentials even for local work.
+- `ENCRYPT_KEY` must be a valid Fernet key (generate via `python - <<'PY'\nfrom cryptography.fernet import Fernet\nprint(Fernet.generate_key().decode())\nPY`).
 - Only set `OPENAI_API_KEY`, `VERTEX_*`, or `GCS_*` if you plan to use those services locally.
 
 Hot reload:
@@ -153,7 +158,7 @@ gcloud storage buckets add-iam-policy-binding gs://tf-state-prod-deployment-4835
   --member="serviceAccount:terraform-prod@prod-deployment-483516.iam.gserviceaccount.com" \
   --role="roles/storage.objectAdmin"
 ```
-Notes: bucket names must remain globally unique; GCS backend has no state locking—serialize applies (e.g., one CI pipeline at a time).
+Notes: bucket names must remain globally unique; serialize plans/applies to avoid state-lock contention.
 
 ## Build & Push Images
 Artifact Registry (recommended). Example for `us-central1` and repo `app`:
@@ -173,9 +178,12 @@ Create secrets (examples):
 ```sh
 gcloud secrets create db-password --replication-policy=automatic
 echo -n "your-db-password" | gcloud secrets versions add db-password --data-file=-
+
+gcloud secrets create encrypt-key --replication-policy=automatic
+echo -n "your-fernet-key" | gcloud secrets versions add encrypt-key --data-file=-
 ```
 Important: the secret **must** have at least one version. If you created the secret without adding a version, Terraform will fail with “secret not found or has no versions.”
-Do likewise for `secret-key`, `encrypt-key`, `openai-key`, etc. Keep values out of git and TF state. Best practice: mount secrets into Cloud Run via secret env vars (module can be extended) or set runtime envs manually after deploy. Note: the DB password is read from Secret Manager by Terraform (`data "google_secret_manager_secret_version"`), so it does not need to live in tfvars.
+Do likewise for `secret-key`, `openai-key`, etc. Keep values out of git and TF state. Best practice: mount secrets into Cloud Run via secret env vars (module can be extended) or set runtime envs manually after deploy. The backend now reads `ENCRYPT_KEY` from Secret Manager via the `encrypt-key` secret (override with `encrypt_key_secret_name` in Terraform). Note: the DB password is read from Secret Manager by Terraform (`data "google_secret_manager_secret_version"`), so it does not need to live in tfvars.
 
 Grant the Terraform service account access to `db-password` in both dev and prod projects:
 ```sh
@@ -304,9 +312,25 @@ Deploy flow:
 
 ## CI/CD
 - GitHub Actions workflows:
-  - `ci.yml`: PR validation (backend tests, migrations check, frontend build, Terraform plan)
+  - `ci.yml`: PR validation (backend tests, migrations check, frontend build; Terraform plan runs after these succeed)
   - `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test)
   - `deploy-prod.yml`: manual prod deploy with GitHub Environment approvals
+
+### Local CI with act
+To test `ci.yml` locally before opening a PR:
+```sh
+make ci-local
+```
+Notes:
+- Terraform plan is skipped locally by design (no service account access).
+- `make ci-local` auto-detects your current git branch and default branch to generate the event payload.
+- `make ci-local` runs with `--container-architecture linux/amd64` for Apple Silicon compatibility.
+- `make ci-local` runs the CI jobs sequentially to avoid local toolcache races.
+- Provide secrets to act if needed (e.g., `ENCRYPT_KEY_TEST`) via a secret file:
+  1) Copy `.github/act/secrets.example` to `.github/act/secrets`
+  2) Fill in values
+- CI services use `localhost` on GitHub runners and for `act` by default. Ports are mapped to 15432/16379 to avoid local conflicts.
+- To override local ports for `act`, copy `.github/act/env.example` to `.github/act/env` and edit the `ACT_DB_*` / `ACT_REDIS_*` values.
 
 ### Workload Identity Federation (DEV/PROD)
 Use Workload Identity Federation (WIF) so GitHub Actions can authenticate to GCP without long-lived service account keys. The following example shows how to create the **dev** pool and provider and output the resource name for the GitHub secret. Repeat for **prod** with a different pool name (e.g. `github-actions-prod`) and prod project/service account.
@@ -368,13 +392,14 @@ If you want different buckets per env, use Environment-level variables or duplic
 
 Repository secrets (shared)
 - GOOGLE_CHAT_WEBHOOK_DEV
+- ENCRYPT_KEY_TEST
 
 Environment secrets (prod)
 - GOOGLE_CHAT_WEBHOOK_PROD
 
 Store non-sensitive values above as GitHub Variables, not secrets.
 Note: You can split service accounts by role (CI build vs Terraform vs migrations) for least privilege, but this repo now uses the Terraform service account for all steps per environment.
-Migrations now fetch the DB password from GCP Secret Manager (`db-password`). Ensure the Terraform service account has `roles/secretmanager.secretAccessor` on that secret in both dev and prod.
+Migrations now fetch the DB password and encrypt key from GCP Secret Manager (`db-password`, `encrypt-key`). Ensure the Terraform service account has `roles/secretmanager.secretAccessor` on those secrets in both dev and prod.
 
 ### GitHub Environment setup for prod
 1) Go to Settings -> Environments -> New environment -> name it `prod`.
@@ -487,3 +512,5 @@ vertex_ai_quota_overrides = [
 
 ## License
 This project is licensed under the terms of the MIT license. See [LICENSE](LICENSE) for details.
+
+Successful merge!

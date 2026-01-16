@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Detect what changed to run only relevant checks
   changes:
@@ -42,7 +46,7 @@ jobs:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: test
         ports:
-          - 5432:5432
+          - 15432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -52,7 +56,7 @@ jobs:
       redis:
         image: redis:7-alpine
         ports:
-          - 6379:6379
+          - 16379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -63,13 +67,10 @@ jobs:
       MODE: testing
       PROJECT_NAME: fastapi-sqlmodel-alembic
       OPENAI_API_KEY: test
+      ENCRYPT_KEY: ${{ secrets.ENCRYPT_KEY_TEST }}
       DATABASE_USER: test
       DATABASE_PASSWORD: test
-      DATABASE_HOST: localhost
-      DATABASE_PORT: 5432
       DATABASE_NAME: test
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
       FIRST_SUPERUSER_EMAIL: admin@example.com
       FIRST_SUPERUSER_PASSWORD: admin
       WHEATER_URL: https://wttr.in
@@ -77,6 +78,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set service env
+        run: |
+          echo "DATABASE_HOST=${ACT_DB_HOST:-localhost}" >> $GITHUB_ENV
+          echo "DATABASE_PORT=${ACT_DB_PORT:-15432}" >> $GITHUB_ENV
+          echo "REDIS_HOST=${ACT_REDIS_HOST:-localhost}" >> $GITHUB_ENV
+          echo "REDIS_PORT=${ACT_REDIS_PORT:-16379}" >> $GITHUB_ENV
 
       - uses: actions/setup-python@v5
         with:
@@ -98,6 +106,12 @@ jobs:
           cd backend/app
           uv run mypy .
         continue-on-error: true
+
+      - name: Prepare database
+        run: |
+          cd backend/app
+          uv run alembic upgrade head
+          uv run python app/initial_data.py
 
       - name: Run tests
         run: |
@@ -125,7 +139,7 @@ jobs:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: test
         ports:
-          - 5432:5432
+          - 15432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -136,13 +150,10 @@ jobs:
       MODE: testing
       PROJECT_NAME: fastapi-sqlmodel-alembic
       OPENAI_API_KEY: test
+      ENCRYPT_KEY: ${{ secrets.ENCRYPT_KEY_TEST }}
       DATABASE_USER: test
       DATABASE_PASSWORD: test
-      DATABASE_HOST: localhost
-      DATABASE_PORT: 5432
       DATABASE_NAME: test
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
       FIRST_SUPERUSER_EMAIL: admin@example.com
       FIRST_SUPERUSER_PASSWORD: admin
       WHEATER_URL: https://wttr.in
@@ -150,6 +161,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set service env
+        run: |
+          echo "DATABASE_HOST=${ACT_DB_HOST:-localhost}" >> $GITHUB_ENV
+          echo "DATABASE_PORT=${ACT_DB_PORT:-15432}" >> $GITHUB_ENV
+          echo "REDIS_HOST=${ACT_REDIS_HOST:-localhost}" >> $GITHUB_ENV
+          echo "REDIS_PORT=${ACT_REDIS_PORT:-16379}" >> $GITHUB_ENV
 
       - uses: actions/setup-python@v5
         with:
@@ -216,13 +234,23 @@ jobs:
 
   # Terraform plan for dev
   terraform-plan-dev:
-    needs: changes
-    if: needs.changes.outputs.infra == 'true'
+    needs: [changes, backend-tests, frontend-tests, migrations-check]
+    if: |
+      needs.changes.outputs.infra == 'true' &&
+      !github.event.act &&
+      (needs.backend-tests.result == 'success' || needs.backend-tests.result == 'skipped') &&
+      (needs.frontend-tests.result == 'success' || needs.frontend-tests.result == 'skipped') &&
+      (needs.migrations-check.result == 'success' || needs.migrations-check.result == 'skipped')
     runs-on: ubuntu-latest
+    concurrency:
+      group: terraform-plan-dev
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
       pull-requests: write
+    env:
+      TF_IN_AUTOMATION: true
 
     steps:
       - uses: actions/checkout@v4
@@ -245,8 +273,12 @@ jobs:
         id: plan
         run: |
           cd infra/terraform/envs/dev
-          terraform plan -no-color -out=tfplan
-        continue-on-error: true
+          terraform plan -input=false -no-color -out=tfplan -lock-timeout=5m \
+            -var="project_id=${{ vars.DEV_PROJECT_ID }}" \
+            -var="region=${{ vars.GCP_REGION }}" \
+            -var="vertex_region=${{ vars.VERTEX_REGION || vars.GCP_REGION }}" \
+            -var="backend_image=${{ vars.ARTIFACT_REGISTRY }}/${{ vars.DEV_PROJECT_ID }}/app/backend:ci-plan" \
+            -var="frontend_image=${{ vars.ARTIFACT_REGISTRY }}/${{ vars.DEV_PROJECT_ID }}/app/frontend:ci-plan"
 
       - name: Post plan to PR
         uses: actions/github-script@v7

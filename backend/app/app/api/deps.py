@@ -14,8 +14,7 @@ from app.core.security import decode_token
 from app.db.session import SessionLocal
 from app.models.user_model import User
 from app.schemas.common_schema import IMetaGeneral, TokenType
-from app.utils.gcs_client import GCSClient
-from app.utils.local_storage_client import LocalStorageClient
+from app.utils.storage_client_factory import get_storage_client
 from app.utils.token import get_valid_tokens
 
 reusable_oauth2 = OAuth2PasswordBearer(
@@ -100,9 +99,4 @@ def get_current_user(required_roles: list[str] = None) -> Callable[[], User]:
 
 
 def storage_client():
-    if settings.STORAGE_BACKEND == "gcs":
-        return GCSClient(
-            bucket_name=settings.GCS_BUCKET or "frontend-assets",
-            url_expire_minutes=settings.GCS_SIGNED_URL_EXPIRE_MINUTES,
-        )
-    return LocalStorageClient(base_path=settings.LOCAL_MEDIA_PATH)
+    return get_storage_client()

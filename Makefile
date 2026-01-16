@@ -68,6 +68,8 @@ help:
 	@echo "        Starts Sonarqube container."	
 	@echo "    stop-sonarqube"
 	@echo "        Stops Sonarqube container."
+	@echo "    ci-local"
+	@echo "        Run CI workflow locally with act (skips Terraform plan)."
 
 install:
 	cd backend/app && \
@@ -155,3 +157,29 @@ run-test:
 
 pytest:
 	docker compose -f docker-compose-test.yml exec fastapi_server pytest
+
+ci-local:
+	@BRANCH=$$(git branch --show-current); \
+	if [ -z "$$BRANCH" ]; then echo "No git branch detected"; exit 1; fi; \
+	DEFAULT_BRANCH=$$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's|^origin/||'); \
+	if [ -z "$$DEFAULT_BRANCH" ]; then DEFAULT_BRANCH=main; fi; \
+	EVENT_FILE=$$(mktemp /tmp/ci-event-XXXXXX.json); \
+	printf '%s\n' \
+	  '{' \
+	  '  "act": true,' \
+	  '  "pull_request": {' \
+	  "    \"base\": { \"ref\": \"$$DEFAULT_BRANCH\" }," \
+	  "    \"head\": { \"ref\": \"$$BRANCH\" }" \
+	  '  },' \
+	  "  \"ref\": \"refs/heads/$$BRANCH\"," \
+	  "  \"repository\": { \"default_branch\": \"$$DEFAULT_BRANCH\" }" \
+	  '}' > $$EVENT_FILE; \
+	ENV_FLAG=""; \
+	if [ -f .github/act/env ]; then ENV_FLAG="--env-file .github/act/env"; fi; \
+	SECRET_FLAG=""; \
+	if [ -f .github/act/secrets ]; then SECRET_FLAG="--secret-file .github/act/secrets"; fi; \
+	JOBS="changes backend-tests migrations-check frontend-tests"; \
+	for job in $$JOBS; do \
+		act -W .github/workflows/ci.yml -j $$job -e $$EVENT_FILE $$ENV_FLAG $$SECRET_FLAG --container-architecture linux/amd64 || exit $$?; \
+	done; \
+	rm -f $$EVENT_FILE

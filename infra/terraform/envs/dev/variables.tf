@@ -8,6 +8,11 @@ variable "allowed_origins" {
   default = ["http://fastapi.localhost", "http://app.localhost"]
 }
 
+variable "encrypt_key_secret_name" {
+  type    = string
+  default = "encrypt-key"
+}
+
 variable "vertex_ai_quota_overrides" {
   type = list(object({
     service        = string

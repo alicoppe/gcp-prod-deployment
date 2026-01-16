@@ -11,6 +11,8 @@ import sqlalchemy_utils
 import sqlmodel  # added
 from app.schemas.chat_schema import ChatRoleEnum
 
+# ci: trigger migration checks
+
 
 # revision identifiers, used by Alembic.
 revision = "2f4b9c1d7a3e"

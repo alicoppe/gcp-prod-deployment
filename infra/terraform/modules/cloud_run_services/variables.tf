@@ -21,6 +21,11 @@ variable "labels" {
   default = {}
 }
 
+variable "encrypt_key_secret_name" {
+  type    = string
+  default = "encrypt-key"
+}
+
 variable "backend_cpu" {
   type    = string
   default = "1"

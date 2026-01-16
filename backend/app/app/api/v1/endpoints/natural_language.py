@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta
 from app.api import deps
 from app.models.user_model import User
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from app.utils.fastapi_globals import g
 from app.schemas.response_schema import IPostResponseBase, create_response
 from fastapi_limiter.depends import RateLimiter

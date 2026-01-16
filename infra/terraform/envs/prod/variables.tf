@@ -8,6 +8,11 @@ variable "allowed_origins" {
   default = ["https://your-domain.com"]
 }
 
+variable "encrypt_key_secret_name" {
+  type    = string
+  default = "encrypt-key"
+}
+
 variable "vertex_ai_quota_overrides" {
   type = list(object({
     service        = string

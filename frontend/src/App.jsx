@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
+// ci: trigger frontend checks
+
 const routes = ['login', 'signup', 'chat', 'profile']
 
 const sampleSessions = [

@@ -29,5 +29,3 @@ api_router.include_router(
     natural_language.router, prefix="/natural_language", tags=["natural_language"]
 )
 api_router.include_router(pubsub.router, prefix="", tags=["pubsub"])
-api_router.include_router(
-)

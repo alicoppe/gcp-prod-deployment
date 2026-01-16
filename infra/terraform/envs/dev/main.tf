@@ -5,6 +5,8 @@ terraform {
   }
 }
 
+# ci: trigger terraform checks
+
 locals {
   labels = {
     env = "dev"
@@ -83,6 +85,7 @@ module "cloud_run" {
   vertex_project_id    = var.project_id
   vertex_region        = var.vertex_region
   cors_origins         = var.allowed_origins
+  encrypt_key_secret_name = var.encrypt_key_secret_name
   vpc_connector        = null
   labels               = local.labels
   backend_cpu          = "1"
