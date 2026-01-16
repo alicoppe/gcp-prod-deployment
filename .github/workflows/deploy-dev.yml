@@ -136,12 +136,16 @@ jobs:
       - name: Terraform apply
         run: |
           cd infra/terraform/envs/dev
+          BACKEND_IMAGE="${{ needs.build-backend.outputs.image }}"
+          FRONTEND_IMAGE="${{ needs.build-frontend.outputs.image }}"
+          TF_ARGS=""
+          if [ -n "$BACKEND_IMAGE" ]; then TF_ARGS="$TF_ARGS -var=backend_image=$BACKEND_IMAGE"; fi
+          if [ -n "$FRONTEND_IMAGE" ]; then TF_ARGS="$TF_ARGS -var=frontend_image=$FRONTEND_IMAGE"; fi
           terraform apply -auto-approve \
             -var="project_id=${{ env.DEV_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
-            -var="backend_image=${{ needs.build-backend.outputs.image || 'SKIP' }}" \
-            -var="frontend_image=${{ needs.build-frontend.outputs.image || 'SKIP' }}"
+            $TF_ARGS
 
       - name: Get outputs
         id: outputs
