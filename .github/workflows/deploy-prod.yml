@@ -41,6 +41,32 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PROD }}
           service_account: ${{ vars.GCP_SA_TERRAFORM_PROD }}
 
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Validate image tags exist
+        env:
+          BACKEND_TAG: ${{ inputs.backend_image_tag }}
+          FRONTEND_TAG: ${{ inputs.frontend_image_tag }}
+        run: |
+          if [ -z "$BACKEND_TAG" ] || [ -z "$FRONTEND_TAG" ]; then
+            echo "backend_image_tag and frontend_image_tag are required."
+            exit 1
+          fi
+          IMAGE_REPO="${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app"
+          if ! gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
+            --filter="package=${IMAGE_REPO}/backend AND tags:${BACKEND_TAG}" \
+            --format="value(package)" | head -n 1 | grep -q backend; then
+            echo "Backend image tag not found: ${IMAGE_REPO}/backend:${BACKEND_TAG}"
+            exit 1
+          fi
+          if ! gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
+            --filter="package=${IMAGE_REPO}/frontend AND tags:${FRONTEND_TAG}" \
+            --format="value(package)" | head -n 1 | grep -q frontend; then
+            echo "Frontend image tag not found: ${IMAGE_REPO}/frontend:${FRONTEND_TAG}"
+            exit 1
+          fi
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.0
