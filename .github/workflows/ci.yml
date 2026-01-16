@@ -107,6 +107,12 @@ jobs:
           uv run mypy .
         continue-on-error: true
 
+      - name: Prepare database
+        run: |
+          cd backend/app
+          uv run alembic upgrade head
+          uv run python app/initial_data.py
+
       - name: Run tests
         run: |
           cd backend/app
