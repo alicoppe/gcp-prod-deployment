@@ -249,6 +249,8 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
+    env:
+      TF_IN_AUTOMATION: true
 
     steps:
       - uses: actions/checkout@v4
@@ -271,8 +273,12 @@ jobs:
         id: plan
         run: |
           cd infra/terraform/envs/dev
-          terraform plan -no-color -out=tfplan -lock-timeout=5m
-        continue-on-error: true
+          terraform plan -input=false -no-color -out=tfplan -lock-timeout=5m \
+            -var="project_id=${{ vars.DEV_PROJECT_ID }}" \
+            -var="region=${{ vars.GCP_REGION }}" \
+            -var="vertex_region=${{ vars.VERTEX_REGION || vars.GCP_REGION }}" \
+            -var="backend_image=${{ vars.ARTIFACT_REGISTRY }}/${{ vars.DEV_PROJECT_ID }}/app/backend:ci-plan" \
+            -var="frontend_image=${{ vars.ARTIFACT_REGISTRY }}/${{ vars.DEV_PROJECT_ID }}/app/frontend:ci-plan"
 
       - name: Post plan to PR
         uses: actions/github-script@v7
