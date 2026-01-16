@@ -175,6 +175,11 @@ docker push us-central1-docker.pkg.dev/PROJECT_ID/app/frontend:dev
 ```
 Set these tags in `infra/terraform/envs/<env>/terraform.tfvars` as `backend_image` / `frontend_image`.
 
+List available images/tags:
+```sh
+gcloud artifacts docker images list us-central1-docker.pkg.dev/<PROJECT_ID>/app --include-tags
+```
+
 ## Secrets (Secret Manager)
 Create secrets (examples):
 ```sh
@@ -316,7 +321,7 @@ Deploy flow:
 ## CI/CD
 - GitHub Actions workflows:
 - `ci.yml`: PR validation (backend tests, migrations check, frontend build; Terraform plan runs after these succeed)
-- `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test) and supports manual `workflow_dispatch`. If build steps are skipped, `terraform.tfvars` must include `backend_image` and `frontend_image`.
+- `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test) and supports manual `workflow_dispatch`. If build steps are skipped, it attempts to deploy images tagged with the current commit SHA; if they don't exist, the workflow fails with a clear error.
 - `deploy-prod.yml`: manual prod deploy with GitHub Environment approvals
 
 ### Local CI with act
