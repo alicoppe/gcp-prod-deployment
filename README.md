@@ -329,7 +329,8 @@ Notes:
 - Provide secrets to act if needed (e.g., `ENCRYPT_KEY_TEST`) via a secret file:
   1) Copy `.github/act/secrets.example` to `.github/act/secrets`
   2) Fill in values
-- CI services use internal container hostnames (`postgres`, `redis`) so no host ports are required locally.
+- CI services use `localhost` on GitHub runners and for `act` by default. Ports are mapped to 15432/16379 to avoid local conflicts.
+- To override local ports for `act`, copy `.github/act/env.example` to `.github/act/env` and edit the `ACT_DB_*` / `ACT_REDIS_*` values.
 
 ### Workload Identity Federation (DEV/PROD)
 Use Workload Identity Federation (WIF) so GitHub Actions can authenticate to GCP without long-lived service account keys. The following example shows how to create the **dev** pool and provider and output the resource name for the GitHub secret. Repeat for **prod** with a different pool name (e.g. `github-actions-prod`) and prod project/service account.

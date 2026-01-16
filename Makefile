@@ -174,14 +174,12 @@ ci-local:
 	  "  \"ref\": \"refs/heads/$$BRANCH\"," \
 	  "  \"repository\": { \"default_branch\": \"$$DEFAULT_BRANCH\" }" \
 	  '}' > $$EVENT_FILE; \
+	ENV_FLAG=""; \
+	if [ -f .github/act/env ]; then ENV_FLAG="--env-file .github/act/env"; fi; \
+	SECRET_FLAG=""; \
+	if [ -f .github/act/secrets ]; then SECRET_FLAG="--secret-file .github/act/secrets"; fi; \
 	JOBS="changes backend-tests migrations-check frontend-tests"; \
-	if [ -f .github/act/secrets ]; then \
-		for job in $$JOBS; do \
-			act -W .github/workflows/ci.yml -j $$job -e $$EVENT_FILE --secret-file .github/act/secrets --container-architecture linux/amd64 || exit $$?; \
-		done; \
-	else \
-		for job in $$JOBS; do \
-			act -W .github/workflows/ci.yml -j $$job -e $$EVENT_FILE --container-architecture linux/amd64 || exit $$?; \
-		done; \
-	fi; \
+	for job in $$JOBS; do \
+		act -W .github/workflows/ci.yml -j $$job -e $$EVENT_FILE $$ENV_FLAG $$SECRET_FLAG --container-architecture linux/amd64 || exit $$?; \
+	done; \
 	rm -f $$EVENT_FILE
