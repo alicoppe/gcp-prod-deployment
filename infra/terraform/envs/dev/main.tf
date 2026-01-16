@@ -5,7 +5,7 @@ terraform {
   }
 }
 
-# ci: trigger terraform checks
+# ci: trigger deploy-dev apply
 
 locals {
   labels = {

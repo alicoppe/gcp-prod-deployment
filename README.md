@@ -315,9 +315,9 @@ Deploy flow:
 
 ## CI/CD
 - GitHub Actions workflows:
-  - `ci.yml`: PR validation (backend tests, migrations check, frontend build; Terraform plan runs after these succeed)
-  - `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test)
-  - `deploy-prod.yml`: manual prod deploy with GitHub Environment approvals
+- `ci.yml`: PR validation (backend tests, migrations check, frontend build; Terraform plan runs after these succeed)
+- `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test) and supports manual `workflow_dispatch`
+- `deploy-prod.yml`: manual prod deploy with GitHub Environment approvals
 
 ### Local CI with act
 To test `ci.yml` locally before opening a PR:
