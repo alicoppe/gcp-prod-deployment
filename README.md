@@ -206,6 +206,7 @@ Fill in (per env `terraform.tfvars`, not committed):
 - `backend_image`, `frontend_image` (Artifact Registry URLs)
 - `allowed_origins` if overriding defaults
 - Optional: `vertex_ai_quota_overrides` (see Cost Controls section)
+Note: `deploy-dev.yml` uses build outputs when available; if backend/frontend builds are skipped, it falls back to the `backend_image`/`frontend_image` values in `terraform.tfvars`.
 
 Run:
 ```sh
@@ -402,6 +403,19 @@ Environment secrets (prod)
 Store non-sensitive values above as GitHub Variables, not secrets.
 Note: You can split service accounts by role (CI build vs Terraform vs migrations) for least privilege, but this repo now uses the Terraform service account for all steps per environment.
 Migrations now fetch the DB password and encrypt key from GCP Secret Manager (`db-password`, `encrypt-key`). Ensure the Terraform service account has `roles/secretmanager.secretAccessor` on those secrets in both dev and prod.
+Terraform service accounts also need permissions to enable APIs and update project IAM:
+- `roles/serviceusage.serviceUsageAdmin`
+- `roles/resourcemanager.projectIamAdmin`
+Grant these roles (per project):
+```sh
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
+  --role="roles/serviceusage.serviceUsageAdmin"
+
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
+  --role="roles/resourcemanager.projectIamAdmin"
+```
 
 ### GitHub Environment setup for prod
 1) Go to Settings -> Environments -> New environment -> name it `prod`.
