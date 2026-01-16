@@ -120,6 +120,8 @@ gcloud services enable cloudresourcemanager.googleapis.com \
   --project <PROJECT_ID>
 gcloud services enable sqladmin.googleapis.com \
   --project <PROJECT_ID>
+gcloud services enable iam.googleapis.com \
+  --project <PROJECT_ID>
 ```
 
 4) Create the app asset buckets (pre-created, referenced by Terraform):

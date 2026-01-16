@@ -3,16 +3,23 @@ resource "google_project_service" "run_api" {
   service = "run.googleapis.com"
 }
 
+resource "google_project_service" "iam_api" {
+  project = var.project_id
+  service = "iam.googleapis.com"
+}
+
 resource "google_service_account" "backend" {
   account_id   = "fastapi-api-sa"
   display_name = "FastAPI Cloud Run SA"
   project      = var.project_id
+  depends_on   = [google_project_service.iam_api]
 }
 
 resource "google_service_account" "frontend" {
   account_id   = "fastapi-frontend-sa"
   display_name = "Frontend Cloud Run SA"
   project      = var.project_id
+  depends_on   = [google_project_service.iam_api]
 }
 
 resource "google_cloud_run_v2_service" "backend" {
