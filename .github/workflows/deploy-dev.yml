@@ -139,26 +139,35 @@ jobs:
           cd infra/terraform/envs/dev
           BACKEND_IMAGE="${{ needs.build-backend.outputs.image }}"
           FRONTEND_IMAGE="${{ needs.build-frontend.outputs.image }}"
+          IMAGE_TAG="${{ github.sha }}"
+          IMAGE_REPO="${{ env.ARTIFACT_REGISTRY }}/${{ env.DEV_PROJECT_ID }}/app"
+          if [ -z "$BACKEND_IMAGE" ]; then
+            if gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
+              --filter="package=${IMAGE_REPO}/backend AND tags:${IMAGE_TAG}" \
+              --format="value(package)" | head -n 1 | grep -q backend; then
+              BACKEND_IMAGE="${IMAGE_REPO}/backend:${IMAGE_TAG}"
+            fi
+          fi
+          if [ -z "$FRONTEND_IMAGE" ]; then
+            if gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
+              --filter="package=${IMAGE_REPO}/frontend AND tags:${IMAGE_TAG}" \
+              --format="value(package)" | head -n 1 | grep -q frontend; then
+              FRONTEND_IMAGE="${IMAGE_REPO}/frontend:${IMAGE_TAG}"
+            fi
+          fi
           TF_ARGS=""
           if [ -n "$BACKEND_IMAGE" ]; then TF_ARGS="$TF_ARGS -var=backend_image=$BACKEND_IMAGE"; fi
           if [ -n "$FRONTEND_IMAGE" ]; then TF_ARGS="$TF_ARGS -var=frontend_image=$FRONTEND_IMAGE"; fi
-          if [ -z "$BACKEND_IMAGE" ] && [ -z "$FRONTEND_IMAGE" ]; then
-            if [ ! -f terraform.tfvars ]; then
-              echo "terraform.tfvars not found and build outputs are empty. Provide backend_image/frontend_image or add terraform.tfvars."
-              exit 1
-            fi
-            if ! grep -q '^[[:space:]]*backend_image[[:space:]]*=' terraform.tfvars || \
-               ! grep -q '^[[:space:]]*frontend_image[[:space:]]*=' terraform.tfvars; then
-              echo "terraform.tfvars is missing backend_image or frontend_image. Provide values or run the build jobs."
-              exit 1
-            fi
+          if [ -z "$BACKEND_IMAGE" ] || [ -z "$FRONTEND_IMAGE" ]; then
+            echo "Missing backend_image or frontend_image. Build jobs were skipped and no images were found for tag ${IMAGE_TAG}."
+            echo "Push images or re-run with backend/frontend changes so build outputs exist."
+            exit 1
           fi
           terraform apply -auto-approve \
             -input=false \
             -var="project_id=${{ env.DEV_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
-            -var-file=terraform.tfvars \
             $TF_ARGS
 
       - name: Get outputs

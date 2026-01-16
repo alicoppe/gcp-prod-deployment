@@ -3,14 +3,6 @@ name: Deploy to Production
 on:
   workflow_dispatch:
     inputs:
-      backend_image_tag:
-        description: 'Backend image SHA (from dev build)'
-        required: true
-        type: string
-      frontend_image_tag:
-        description: 'Frontend image SHA (from dev build)'
-        required: true
-        type: string
       skip_migrations:
         description: 'Skip Alembic migrations'
         required: false
@@ -41,6 +33,30 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PROD }}
           service_account: ${{ vars.GCP_SA_TERRAFORM_PROD }}
 
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Resolve image tags
+        env:
+          BACKEND_TAG: ${{ github.sha }}
+          FRONTEND_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_REPO="${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app"
+          if ! gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
+            --filter="package=${IMAGE_REPO}/backend AND tags:${BACKEND_TAG}" \
+            --format="value(package)" | head -n 1 | grep -q backend; then
+            echo "Backend image tag not found: ${IMAGE_REPO}/backend:${BACKEND_TAG}"
+            exit 1
+          fi
+          if ! gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
+            --filter="package=${IMAGE_REPO}/frontend AND tags:${FRONTEND_TAG}" \
+            --format="value(package)" | head -n 1 | grep -q frontend; then
+            echo "Frontend image tag not found: ${IMAGE_REPO}/frontend:${FRONTEND_TAG}"
+            exit 1
+          fi
+          echo "BACKEND_TAG=${BACKEND_TAG}" >> $GITHUB_ENV
+          echo "FRONTEND_TAG=${FRONTEND_TAG}" >> $GITHUB_ENV
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.0
@@ -58,8 +74,8 @@ jobs:
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
-            -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ inputs.backend_image_tag }}" \
-            -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ inputs.frontend_image_tag }}"
+            -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ env.BACKEND_TAG }}" \
+            -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ env.FRONTEND_TAG }}"
 
       - name: Terraform apply
         run: |
@@ -68,8 +84,8 @@ jobs:
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
-            -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ inputs.backend_image_tag }}" \
-            -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ inputs.frontend_image_tag }}"
+            -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ env.BACKEND_TAG }}" \
+            -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ env.FRONTEND_TAG }}"
 
       - name: Get outputs
         id: outputs
@@ -197,13 +213,13 @@ jobs:
                   {
                     "decoratedText": {
                       "topLabel": "Backend Image",
-                      "text": "${{ inputs.backend_image_tag }}"
+                      "text": "${{ env.BACKEND_TAG }}"
                     }
                   },
                   {
                     "decoratedText": {
                       "topLabel": "Frontend Image",
-                      "text": "${{ inputs.frontend_image_tag }}"
+                      "text": "${{ env.FRONTEND_TAG }}"
                     }
                   },
                   {
