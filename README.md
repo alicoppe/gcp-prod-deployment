@@ -386,7 +386,8 @@ Repository variables (non-secret)
 - ARTIFACT_REGISTRY (example: us-central1-docker.pkg.dev)
 - DEV_PROJECT_ID
 - PROD_PROJECT_ID
-- VITE_ASSET_BUCKET (asset bucket name baked into the frontend build)
+- VITE_ASSET_BUCKET (dev asset bucket name baked into the frontend build)
+- VITE_ASSET_BUCKET_PROD (prod asset bucket name baked into the frontend build)
 - GCP_WIF_PROVIDER_DEV
 - GCP_WIF_PROVIDER_PROD
 - GCP_SA_TERRAFORM_DEV

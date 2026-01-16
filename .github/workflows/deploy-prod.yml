@@ -74,7 +74,7 @@ jobs:
         run: |
           IMAGE="${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ github.sha }}"
           docker build -t $IMAGE -f frontend/Dockerfile \
-            --build-arg VITE_ASSET_BUCKET=${{ vars.VITE_ASSET_BUCKET }} \
+            --build-arg VITE_ASSET_BUCKET=${{ vars.VITE_ASSET_BUCKET_PROD }} \
             frontend
           docker push $IMAGE
           echo "name=$IMAGE" >> $GITHUB_OUTPUT
