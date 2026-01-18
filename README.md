@@ -323,6 +323,7 @@ Deploy flow:
 - `ci.yml`: PR validation (backend tests, migrations check, frontend build; Terraform plan runs after these succeed)
 - `deploy-dev.yml`: auto deploy on `main` (build images, Terraform apply, migrations, smoke test) and supports manual `workflow_dispatch`. Infra changes also trigger backend/frontend image rebuilds to avoid manual image selection.
 - `deploy-prod.yml`: manual prod deploy with GitHub Environment approvals
+  - runs only after a successful `deploy-dev.yml` for the same commit on the default branch.
   - builds and pushes backend/frontend images for the current commit SHA, then deploys them.
 
 ### Local CI with act
@@ -410,9 +411,10 @@ Environment secrets (prod)
 Store non-sensitive values above as GitHub Variables, not secrets.
 Note: You can split service accounts by role (CI build vs Terraform vs migrations) for least privilege, but this repo now uses the Terraform service account for all steps per environment.
 Migrations now fetch the DB password and encrypt key from GCP Secret Manager (`db-password`, `encrypt-key`). Ensure the Terraform service account has `roles/secretmanager.secretAccessor` on those secrets in both dev and prod.
-Terraform service accounts also need permissions to enable APIs and update project IAM:
+Terraform service accounts also need permissions to enable APIs and update project IAM, and to manage Cloud Run IAM policies:
 - `roles/serviceusage.serviceUsageAdmin`
 - `roles/resourcemanager.projectIamAdmin`
+- `roles/run.admin`
 Grant these roles (per project):
 ```sh
 gcloud projects add-iam-policy-binding <PROJECT_ID> \
@@ -422,6 +424,10 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
 gcloud projects add-iam-policy-binding <PROJECT_ID> \
   --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
   --role="roles/resourcemanager.projectIamAdmin"
+
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
+  --role="roles/run.admin"
 ```
 
 ### GitHub Environment setup for prod
@@ -431,7 +437,7 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
 4) Add the environment-specific secrets above.
 5) Migrations run under the same `prod` environment approval by default.
 
-Now when you run `deploy-prod.yml`, it will pause at the `terraform-apply-prod` job until you approve in the Actions UI.
+`deploy-prod.yml` is manual, but it will only proceed if `deploy-dev.yml` has succeeded for the same commit on the default branch. It pauses at `terraform-apply-prod` until you approve in the Actions UI.
 
 ### Google Chat notifications (webhooks)
 1) Create a webhook in Google Chat
@@ -479,9 +485,7 @@ Deploy to dev:
 Deploy to prod:
 ```bash
 # Go to Actions -> Deploy to Production -> Run workflow
-# Input:
-#   backend_image_tag: <commit-sha-from-dev>
-#   frontend_image_tag: <same-sha>
+# Must be run on the default branch, and only after Deploy to Dev succeeded for this commit.
 # Workflow pauses for approval -> apply -> migrations -> smoke test
 ```
 

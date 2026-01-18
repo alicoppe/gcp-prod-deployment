@@ -12,5 +12,6 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 COPY --from=build /app ./
-EXPOSE 5173
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]
+ENV PORT=8080
+EXPOSE 8080
+CMD ["sh", "-c", "npm run preview -- --host 0.0.0.0 --port ${PORT}"]
