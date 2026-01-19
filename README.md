@@ -498,6 +498,7 @@ Deploy to prod:
   - `backend_cpu`, `backend_memory`, `backend_min_instances`, `backend_max_instances`.
   - `frontend_cpu`, `frontend_memory`, `frontend_min_instances`, `frontend_max_instances`.
   - `cors_origins`, `vpc_connector`.
+  - `cloud_run_deletion_protection` (set to `false` in dev to allow replacements; `true` in prod for safety).
 - Storage: bucket names (`app-frontend-dev/prod`), `force_destroy` flag.
 - Scheduler: cron (`schedule`), payload JSON, time zone.
 - Artifact Registry: repo id/region if you change from `app` / `us-central1`.

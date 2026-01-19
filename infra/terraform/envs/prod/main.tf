@@ -85,6 +85,7 @@ module "cloud_run" {
   vertex_region        = var.vertex_region
   cors_origins         = var.allowed_origins
   encrypt_key_secret_name = var.encrypt_key_secret_name
+  cloud_run_deletion_protection = true
   vpc_connector        = null
   labels               = local.labels
   backend_cpu          = "1"

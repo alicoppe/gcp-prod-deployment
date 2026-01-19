@@ -59,3 +59,8 @@ variable "frontend_max_instances" {
   type    = number
   default = 1
 }
+
+variable "cloud_run_deletion_protection" {
+  type    = bool
+  default = true
+}
