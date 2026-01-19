@@ -134,6 +134,11 @@ jobs:
           cd infra/terraform/envs/dev
           terraform init
 
+      - name: Clear tainted frontend (one-time recovery)
+        run: |
+          cd infra/terraform/envs/dev
+          terraform untaint module.cloud_run.google_cloud_run_v2_service.frontend || true
+
       - name: Terraform apply
         run: |
           cd infra/terraform/envs/dev
