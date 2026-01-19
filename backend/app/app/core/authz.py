@@ -7,7 +7,7 @@ from oso import Oso  # (1)
 
 oso = Oso()  # (2)
 
-# load policies
+# load classes into Oso (3)
 oso.register_class(Hero)
 oso.register_class(User)
 
