@@ -147,6 +147,18 @@ jobs:
           IMAGE_TAG="${{ github.sha }}"
           IMAGE_REPO="${{ env.ARTIFACT_REGISTRY }}/${{ env.DEV_PROJECT_ID }}/app"
           if [ -z "$BACKEND_IMAGE" ]; then
+            BACKEND_IMAGE=$(gcloud run services describe fastapi-backend \
+              --region "${{ env.GCP_REGION }}" \
+              --project "${{ env.DEV_PROJECT_ID }}" \
+              --format="value(spec.template.spec.containers[0].image)" || true)
+          fi
+          if [ -z "$FRONTEND_IMAGE" ]; then
+            FRONTEND_IMAGE=$(gcloud run services describe fastapi-frontend \
+              --region "${{ env.GCP_REGION }}" \
+              --project "${{ env.DEV_PROJECT_ID }}" \
+              --format="value(spec.template.spec.containers[0].image)" || true)
+          fi
+          if [ -z "$BACKEND_IMAGE" ]; then
             if gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
               --filter="package=${IMAGE_REPO}/backend AND tags:${IMAGE_TAG}" \
               --format="value(package)" | head -n 1 | grep -q backend; then
