@@ -260,8 +260,17 @@ jobs:
       - name: Health check
         run: |
           BACKEND_URL="${{ needs.terraform-apply-dev.outputs.backend_url }}"
-          curl -f "$BACKEND_URL/health" || exit 1
-          echo "Dev deployment healthy"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Dev deployment healthy"
+              exit 0
+            fi
+            echo "Health check attempt $i/30 returned $STATUS. Retrying in 10s..."
+            sleep 10
+          done
+          echo "Health check failed after 5 minutes"
+          exit 1
 
   # Notify Google Chat that dev is ready
   notify-dev-success:
