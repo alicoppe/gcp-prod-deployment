@@ -18,4 +18,7 @@ ARG INSTALL_DEV=false
 RUN bash -c "if [ \"$INSTALL_DEV\" = 'true' ] ; then uv sync --frozen --extra dev --no-install-project ; else uv sync --frozen --no-install-project ; fi"
 
 ENV PYTHONPATH=/code
+ENV APP_MODULE=app.main:app
+ENV PORT=8080
+COPY app /code/app
 EXPOSE 8000
