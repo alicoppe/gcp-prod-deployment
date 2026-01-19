@@ -26,6 +26,7 @@ resource "google_cloud_run_v2_service" "backend" {
   name     = "fastapi-backend"
   location = var.region
   project  = var.project_id
+  deletion_protection = var.cloud_run_deletion_protection
 
   template {
     service_account = google_service_account.backend.email
@@ -113,6 +114,7 @@ resource "google_cloud_run_v2_service" "frontend" {
   name     = "fastapi-frontend"
   location = var.region
   project  = var.project_id
+  deletion_protection = var.cloud_run_deletion_protection
 
   template {
     service_account = google_service_account.frontend.email
