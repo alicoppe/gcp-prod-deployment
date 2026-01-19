@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     def assemble_db_connection(cls, v: str | None, info: FieldValidationInfo) -> Any:
         if isinstance(v, str):
             if v == "":
+                required_keys = (
+                    "DATABASE_USER",
+                    "DATABASE_PASSWORD",
+                    "DATABASE_HOST",
+                    "DATABASE_PORT",
+                    "DATABASE_NAME",
+                )
+                if any(info.data.get(key) in (None, "") for key in required_keys):
+                    return v
                 return PostgresDsn.build(
                     scheme="postgresql+asyncpg",
                     username=info.data["DATABASE_USER"],
