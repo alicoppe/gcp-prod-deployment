@@ -5,7 +5,7 @@ terraform {
   }
 }
 
-# ci: trigger deploy-dev
+# ci: trigger deploy-dev rerun
 
 locals {
   labels = {
