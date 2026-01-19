@@ -411,6 +411,13 @@ Environment secrets (prod)
 Store non-sensitive values above as GitHub Variables, not secrets.
 Note: You can split service accounts by role (CI build vs Terraform vs migrations) for least privilege, but this repo now uses the Terraform service account for all steps per environment.
 Migrations now fetch the DB password and encrypt key from GCP Secret Manager (`db-password`, `encrypt-key`). Ensure the Terraform service account has `roles/secretmanager.secretAccessor` on those secrets in both dev and prod.
+Grant secret access (per project) if needed:
+```sh
+gcloud secrets add-iam-policy-binding encrypt-key \
+  --project <PROJECT_ID> \
+  --member "serviceAccount:<TERRAFORM_SA_EMAIL>" \
+  --role "roles/secretmanager.secretAccessor"
+```
 Terraform service accounts also need permissions to enable APIs and update project IAM, and to manage Cloud Run IAM policies:
 - `roles/serviceusage.serviceUsageAdmin`
 - `roles/resourcemanager.projectIamAdmin`
