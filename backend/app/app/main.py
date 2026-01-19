@@ -20,7 +20,6 @@ from fastapi_limiter.depends import WebSocketRateLimiter
 from jwt import DecodeError, ExpiredSignatureError, MissingRequiredClaimError
 from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
 from starlette.middleware.cors import CORSMiddleware
-from transformers import pipeline
 
 from app import crud
 from app.api.deps import get_redis_client
@@ -34,6 +33,40 @@ from app.utils.llm_client import ChatClient
 from app.utils.uuid6 import uuid7
 
 # ci: trigger backend checks
+
+
+def _torch_version_ok() -> bool:
+    try:
+        import torch
+    except Exception:
+        return False
+    version_str = torch.__version__.split("+")[0]
+    try:
+        parts = [int(p) for p in version_str.split(".")]
+    except ValueError:
+        return True
+    if len(parts) < 2:
+        return True
+    return (parts[0], parts[1]) >= (2, 1)
+
+
+def _load_sentiment_model() -> Any | None:
+    if not _torch_version_ok():
+        logging.warning("Torch < 2.1 detected; sentiment model disabled.")
+        return None
+    try:
+        from transformers import pipeline
+    except Exception as exc:
+        logging.warning("Transformers pipeline unavailable: %s", exc)
+        return None
+    try:
+        return pipeline(
+            "sentiment-analysis",
+            model="distilbert-base-uncased-finetuned-sst-2-english",
+        )
+    except Exception as exc:
+        logging.warning("Failed to load sentiment model: %s", exc)
+        return None
 
 
 async def user_id_identifier(request: Request):
@@ -88,12 +121,7 @@ async def lifespan(app: FastAPI):
     await FastAPILimiter.init(redis_client, identifier=user_id_identifier)
 
     # Load a pre-trained sentiment analysis model as a dictionary to an easy cleanup
-    models: dict[str, Any] = {
-        "sentiment_model": pipeline(
-            "sentiment-analysis",
-            model="distilbert-base-uncased-finetuned-sst-2-english",
-        ),
-    }
+    models: dict[str, Any] = {"sentiment_model": _load_sentiment_model()}
     g.set_default("sentiment_model", models["sentiment_model"])
     g.set_default("chat_client", ChatClient())
     print("startup fastapi")
