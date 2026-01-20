@@ -7,7 +7,6 @@ from oso import Oso  # (1)
 
 oso = Oso()  # (2)
 # load classes into Oso (3)
-# Rerun backend
 oso.register_class(Hero)
 oso.register_class(User)
 

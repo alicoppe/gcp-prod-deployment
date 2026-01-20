@@ -116,6 +116,10 @@ resource "google_cloud_run_v2_service" "backend" {
         value = var.vertex_region
       }
       env {
+        name  = "WEB_CONCURRENCY"
+        value = tostring(var.web_concurrency)
+      }
+      env {
         name  = "PROJECT_NAME"
         value = var.project_name
       }
