@@ -78,6 +78,11 @@ module "cloud_run" {
   frontend_image = var.frontend_image
 
   db_connection_string = module.sql.uri
+  db_user              = module.sql.db_user
+  db_name              = module.sql.db_name
+  db_host              = module.sql.public_ip
+  db_port              = 5432
+  db_password_secret_name = "db-password"
   redis_host           = module.redis.host
   redis_port           = module.redis.port
   bucket_name          = module.storage.bucket_name
@@ -85,6 +90,7 @@ module "cloud_run" {
   vertex_region        = var.vertex_region
   cors_origins         = var.allowed_origins
   encrypt_key_secret_name = var.encrypt_key_secret_name
+  project_name         = var.project_name
   cloud_run_deletion_protection = true
   vpc_connector        = null
   labels               = local.labels

@@ -1,6 +1,8 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app import crud
 from app.schemas.role_schema import IRoleCreate
+import os
+
 from app.core.config import settings
 from app.schemas.user_schema import IUserCreate
 from app.schemas.team_schema import ITeamCreate
@@ -17,38 +19,45 @@ groups: list[IGroupCreate] = [
     IGroupCreate(name="GR1", description="This is the first group")
 ]
 
-users: list[dict[str, str | IUserCreate]] = [
-    {
-        "data": IUserCreate(
-            first_name="Admin",
-            last_name="FastAPI",
-            password=settings.FIRST_SUPERUSER_PASSWORD,
-            email=settings.FIRST_SUPERUSER_EMAIL,
-            is_superuser=True,
-        ),
-        "role": "admin",
-    },
-    {
-        "data": IUserCreate(
-            first_name="Manager",
-            last_name="FastAPI",
-            password=settings.FIRST_SUPERUSER_PASSWORD,
-            email="manager@example.com",
-            is_superuser=False,
-        ),
-        "role": "manager",
-    },
-    {
-        "data": IUserCreate(
-            first_name="User",
-            last_name="FastAPI",
-            password=settings.FIRST_SUPERUSER_PASSWORD,
-            email="user@example.com",
-            is_superuser=False,
-        ),
-        "role": "user",
-    },
-]
+def _seed_users() -> list[dict[str, str | IUserCreate]]:
+    email = os.getenv("FIRST_SUPERUSER_EMAIL") or settings.FIRST_SUPERUSER_EMAIL
+    password = os.getenv("FIRST_SUPERUSER_PASSWORD") or settings.FIRST_SUPERUSER_PASSWORD
+    if not email or not password:
+        raise RuntimeError(
+            "FIRST_SUPERUSER_EMAIL and FIRST_SUPERUSER_PASSWORD must be set for init_db"
+        )
+    return [
+        {
+            "data": IUserCreate(
+                first_name="Admin",
+                last_name="FastAPI",
+                password=password,
+                email=email,
+                is_superuser=True,
+            ),
+            "role": "admin",
+        },
+        {
+            "data": IUserCreate(
+                first_name="Manager",
+                last_name="FastAPI",
+                password=password,
+                email="manager@example.com",
+                is_superuser=False,
+            ),
+            "role": "manager",
+        },
+        {
+            "data": IUserCreate(
+                first_name="User",
+                last_name="FastAPI",
+                password=password,
+                email="user@example.com",
+                is_superuser=False,
+            ),
+            "role": "user",
+        },
+    ]
 
 teams: list[ITeamCreate] = [
     ITeamCreate(name="Preventers", headquarters="Sharp Tower"),
@@ -68,6 +77,7 @@ heroes: list[dict[str, str | IHeroCreate]] = [
 
 
 async def init_db(db_session: AsyncSession) -> None:
+    users = _seed_users()
     for role in roles:
         role_current = await crud.role.get_role_by_name(
             name=role.name, db_session=db_session

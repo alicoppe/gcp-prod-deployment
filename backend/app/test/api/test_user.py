@@ -1,3 +1,4 @@
+import os
 import pytest
 from httpx import AsyncClient
 from app.main import app
@@ -5,6 +6,11 @@ from typing import AsyncGenerator
 from app.core.config import settings
 
 url = "http://fastapi.localhost/api/v1"
+
+def _seed_creds() -> tuple[str, str]:
+    email = os.getenv("FIRST_SUPERUSER_EMAIL") or settings.FIRST_SUPERUSER_EMAIL or "admin@example.com"
+    password = os.getenv("FIRST_SUPERUSER_PASSWORD") or settings.FIRST_SUPERUSER_PASSWORD or "admin"
+    return email, password
 
 @pytest.fixture(scope='function')
 async def test_client() -> AsyncGenerator[AsyncClient, None]:
@@ -23,7 +29,8 @@ class TestPostLogin:
     )
     async def test(self, test_client, method, endpoint, data, expected_status, expected_response):        
         async for client in test_client:        
-            credentials = {"email": settings.FIRST_SUPERUSER_EMAIL, "password": settings.FIRST_SUPERUSER_PASSWORD}
+            email, password = _seed_creds()
+            credentials = {"email": email, "password": password}
             response = await client.post("/login", json=credentials)
             access_token = response.json()["data"]["access_token"]
             if method == "get":

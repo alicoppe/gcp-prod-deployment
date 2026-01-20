@@ -71,9 +71,6 @@ jobs:
       DATABASE_USER: test
       DATABASE_PASSWORD: test
       DATABASE_NAME: test
-      FIRST_SUPERUSER_EMAIL: admin@example.com
-      FIRST_SUPERUSER_PASSWORD: admin
-      WHEATER_URL: https://wttr.in
       BACKEND_CORS_ORIGINS: http://localhost
 
     steps:
@@ -111,6 +108,8 @@ jobs:
         run: |
           cd backend/app
           uv run alembic upgrade head
+          FIRST_SUPERUSER_EMAIL="admin@example.com" \
+          FIRST_SUPERUSER_PASSWORD="admin" \
           uv run python app/initial_data.py
 
       - name: Run tests
@@ -154,9 +153,6 @@ jobs:
       DATABASE_USER: test
       DATABASE_PASSWORD: test
       DATABASE_NAME: test
-      FIRST_SUPERUSER_EMAIL: admin@example.com
-      FIRST_SUPERUSER_PASSWORD: admin
-      WHEATER_URL: https://wttr.in
       BACKEND_CORS_ORIGINS: http://localhost
 
     steps:

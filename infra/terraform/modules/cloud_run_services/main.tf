@@ -37,10 +37,39 @@ resource "google_cloud_run_v2_service" "backend" {
           cpu    = var.backend_cpu
           memory = var.backend_memory
         }
+        cpu_idle = true
       }
       env {
         name  = "DATABASE_URL"
         value = var.db_connection_string
+      }
+      env {
+        name  = "DATABASE_USER"
+        value = var.db_user
+      }
+      dynamic "env" {
+        for_each = var.db_password_secret_name == null || var.db_password_secret_name == "" ? [] : [var.db_password_secret_name]
+        content {
+          name = "DATABASE_PASSWORD"
+          value_source {
+            secret_key_ref {
+              secret  = env.value
+              version = "latest"
+            }
+          }
+        }
+      }
+      env {
+        name  = "DATABASE_HOST"
+        value = var.db_host
+      }
+      env {
+        name  = "DATABASE_PORT"
+        value = tostring(var.db_port)
+      }
+      env {
+        name  = "DATABASE_NAME"
+        value = var.db_name
       }
       env {
         name  = "REDIS_HOST"
@@ -86,6 +115,10 @@ resource "google_cloud_run_v2_service" "backend" {
         name  = "VERTEX_REGION"
         value = var.vertex_region
       }
+      env {
+        name  = "PROJECT_NAME"
+        value = var.project_name
+      }
     }
     dynamic "vpc_access" {
       for_each = var.vpc_connector == null ? [] : [var.vpc_connector]
@@ -125,6 +158,7 @@ resource "google_cloud_run_v2_service" "frontend" {
           cpu    = var.frontend_cpu
           memory = var.frontend_memory
         }
+        cpu_idle = true
       }
       env {
         name  = "VITE_API_URL"

@@ -1,3 +1,4 @@
+import os
 import pytest
 from httpx import AsyncClient
 from typing import AsyncGenerator
@@ -5,6 +6,11 @@ from app.main import app
 from app.core.config import settings
 
 url = "http://fastapi.localhost/api/v1"
+
+def _seed_creds() -> tuple[str, str]:
+    email = os.getenv("FIRST_SUPERUSER_EMAIL") or settings.FIRST_SUPERUSER_EMAIL or "admin@example.com"
+    password = os.getenv("FIRST_SUPERUSER_PASSWORD") or settings.FIRST_SUPERUSER_PASSWORD or "admin"
+    return email, password
 
 @pytest.fixture(scope='function')
 async def test_client() -> AsyncGenerator[AsyncClient, None]:
@@ -17,7 +23,7 @@ class TestPostLogin:
         "method, endpoint, data, expected_status, expected_response",
         [
             ("post", "/login", {"email": "incorrect_email@gmail.com", "password": "123456"}, 400, {"detail": "Email or Password incorrect"}),
-            ("post", "/login", {"email": settings.FIRST_SUPERUSER_EMAIL, "password": settings.FIRST_SUPERUSER_PASSWORD}, 200, None),  # Add expected JSON response for successful login
+            ("post", "/login", {"email": _seed_creds()[0], "password": _seed_creds()[1]}, 200, None),  # Add expected JSON response for successful login
             ("post", "/login/new_access_token", {"refresh_token": ""}, 403, {"detail": "Error when decoding the token. Please check your request."})
         ],
     )

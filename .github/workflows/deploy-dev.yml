@@ -208,9 +208,6 @@ jobs:
       OPENAI_API_KEY: dummy
       REDIS_HOST: localhost
       REDIS_PORT: 6379
-      FIRST_SUPERUSER_EMAIL: admin@example.com
-      FIRST_SUPERUSER_PASSWORD: admin
-      WHEATER_URL: https://wttr.in
       BACKEND_CORS_ORIGINS: http://localhost
 
     steps:
@@ -257,6 +254,13 @@ jobs:
           cd backend/app
           uv run alembic upgrade head
 
+      - name: Seed initial data (dev only)
+        run: |
+          cd backend/app
+          FIRST_SUPERUSER_EMAIL="admin@example.com" \
+          FIRST_SUPERUSER_PASSWORD="admin" \
+          uv run python app/initial_data.py
+
       - name: Verify migration
         run: |
           cd backend/app
@@ -272,16 +276,26 @@ jobs:
       - name: Health check
         run: |
           BACKEND_URL="${{ needs.terraform-apply-dev.outputs.backend_url }}"
-          for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health" || true)
+          consecutive_500=0
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$BACKEND_URL/health" || true)
             if [ "$STATUS" = "200" ]; then
               echo "Dev deployment healthy"
               exit 0
             fi
-            echo "Health check attempt $i/30 returned $STATUS. Retrying in 10s..."
+            if [ "$STATUS" = "500" ]; then
+              consecutive_500=$((consecutive_500+1))
+              if [ "$consecutive_500" -ge 3 ]; then
+                echo "Health check returned 500 three times; failing fast."
+                exit 1
+              fi
+            else
+              consecutive_500=0
+            fi
+            echo "Health check attempt $i/12 returned $STATUS. Retrying in 10s..."
             sleep 10
           done
-          echo "Health check failed after 5 minutes"
+          echo "Health check failed after 2 minutes"
           exit 1
 
   # Notify Google Chat that dev is ready
