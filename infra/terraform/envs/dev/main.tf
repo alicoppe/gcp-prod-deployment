@@ -96,13 +96,14 @@ module "cloud_run" {
   vpc_connector        = null
   labels               = local.labels
   backend_cpu          = "1"
-  backend_memory       = "512Mi"
+  backend_memory       = "1Gi"
   backend_min_instances = 0
   backend_max_instances = 1
   frontend_cpu         = "1"
   frontend_memory      = "512Mi"
   frontend_min_instances = 0
   frontend_max_instances = 1
+  web_concurrency     = 1
 }
 
 module "pubsub_scheduler" {

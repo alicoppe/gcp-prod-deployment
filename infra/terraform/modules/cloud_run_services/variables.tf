@@ -43,6 +43,10 @@ variable "backend_memory" {
   type    = string
   default = "512Mi"
 }
+variable "web_concurrency" {
+  type    = number
+  default = 1
+}
 variable "backend_min_instances" {
   type    = number
   default = 0
