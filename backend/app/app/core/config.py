@@ -67,15 +67,13 @@ class Settings(BaseSettings):
                 )
         return v
 
-    FIRST_SUPERUSER_EMAIL: EmailStr
-    FIRST_SUPERUSER_PASSWORD: str
+    FIRST_SUPERUSER_EMAIL: EmailStr | None = None
+    FIRST_SUPERUSER_PASSWORD: str | None = None
 
     STORAGE_BACKEND: str = "local"  # gcs | local
     GCS_BUCKET: str | None = None
     GCS_SIGNED_URL_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     LOCAL_MEDIA_PATH: str = "static/uploads"
-
-    WHEATER_URL: AnyHttpUrl
 
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ENCRYPT_KEY: str = _default_encrypt_key()

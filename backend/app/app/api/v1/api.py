@@ -9,7 +9,6 @@ from app.api.v1.endpoints import (
     role,
     group,
     cache,
-    weather,
     report,
     pubsub,
 )
@@ -23,7 +22,6 @@ api_router.include_router(group.router, prefix="/group", tags=["group"])
 api_router.include_router(team.router, prefix="/team", tags=["team"])
 api_router.include_router(hero.router, prefix="/hero", tags=["hero"])
 api_router.include_router(cache.router, prefix="/cache", tags=["cache"])
-api_router.include_router(weather.router, prefix="/weather", tags=["weather"])
 api_router.include_router(report.router, prefix="/report", tags=["report"])
 api_router.include_router(
     natural_language.router, prefix="/natural_language", tags=["natural_language"]
