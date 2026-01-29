@@ -30,6 +30,25 @@ data "google_secret_manager_secret_version" "db_password" {
   version = "latest"
 }
 
+data "google_compute_network" "default" {
+  name = "default"
+}
+
+resource "google_project_service" "vpc_access_api" {
+  project = var.project_id
+  service = "vpcaccess.googleapis.com"
+}
+
+resource "google_vpc_access_connector" "serverless" {
+  name          = "serverless-connector-dev"
+  project       = var.project_id
+  region        = var.region
+  network       = data.google_compute_network.default.name
+  ip_cidr_range = "10.8.0.0/28"
+
+  depends_on = [google_project_service.vpc_access_api]
+}
+
 module "artifact_registry" {
   source     = "../../modules/artifact_registry"
   project_id = var.project_id
@@ -93,7 +112,7 @@ module "cloud_run" {
   encrypt_key_secret_name = var.encrypt_key_secret_name
   project_name         = var.project_name
   cloud_run_deletion_protection = false
-  vpc_connector        = null
+  vpc_connector        = google_vpc_access_connector.serverless.id
   labels               = local.labels
   backend_cpu          = "1"
   backend_memory       = "1Gi"
