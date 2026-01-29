@@ -200,6 +200,19 @@ gcloud secrets add-iam-policy-binding db-password \
   --role="roles/secretmanager.secretAccessor"
 ```
 
+Alternatively, grant project-level Secret Manager access (covers `db-password` and `encrypt-key`):
+```sh
+# Dev
+gcloud projects add-iam-policy-binding dev-deployment-483516 \
+  --member="serviceAccount:terraform-dev@dev-deployment-483516.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+# Prod
+gcloud projects add-iam-policy-binding prod-deployment-483516 \
+  --member="serviceAccount:terraform-prod@prod-deployment-483516.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
 ## Terraform Layout & Apply
 Structure:
 - `infra/terraform/globals`: providers/versions
