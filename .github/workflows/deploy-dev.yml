@@ -312,17 +312,7 @@ jobs:
             READY_STATUS=$(gcloud run services describe "$BACKEND_SERVICE" \
               --region "${{ env.GCP_REGION }}" \
               --project "${{ env.DEV_PROJECT_ID }}" \
-              --format=json | python - <<'PY'
-import json, sys
-svc = json.load(sys.stdin)
-status = svc.get("status", {})
-conds = status.get("conditions", [])
-ready = any(c.get("type") == "Ready" and c.get("status") == "True" for c in conds)
-if not ready:
-    ready = bool(status.get("latestReadyRevision") or status.get("latestReadyRevisionName"))
-print("True" if ready else "False")
-PY
-)
+              --format=json | python -c 'import json,sys; svc=json.load(sys.stdin); status=svc.get("status", {}); conds=status.get("conditions", []); ready=any(c.get("type")=="Ready" and c.get("status")=="True" for c in conds) or bool(status.get("latestReadyRevision") or status.get("latestReadyRevisionName")); print("True" if ready else "False")')
             if [ "$READY_STATUS" = "True" ]; then
               echo "Service Ready after $((i * READY_INTERVAL))s"
               break
