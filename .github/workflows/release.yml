@@ -1,0 +1,122 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.2.3)"
+        required: true
+        type: string
+      name:
+        description: "Release title (defaults to tag)"
+        required: false
+        type: string
+      target_sha:
+        description: "Commit SHA (defaults to the workflow SHA)"
+        required: false
+        type: string
+      generate_notes:
+        description: "Auto-generate release notes"
+        required: true
+        default: true
+        type: boolean
+      prerelease:
+        description: "Mark as pre-release"
+        required: true
+        default: false
+        type: boolean
+      draft:
+        description: "Create as draft"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.release_id }}
+      release_url: ${{ steps.create_release.outputs.release_url }}
+    steps:
+      - name: Create GitHub release
+        id: create_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = core.getInput("tag", { required: true });
+            const nameInput = core.getInput("name");
+            const targetInput = core.getInput("target_sha");
+            const generateNotes = core.getBooleanInput("generate_notes");
+            const prerelease = core.getBooleanInput("prerelease");
+            const draft = core.getBooleanInput("draft");
+
+            const target = targetInput && targetInput.length ? targetInput : context.sha;
+            const name = nameInput && nameInput.length ? nameInput : tag;
+
+            const response = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              target_commitish: target,
+              name,
+              prerelease,
+              draft,
+              generate_release_notes: generateNotes,
+            });
+
+            core.setOutput("release_id", response.data.id.toString());
+            core.setOutput("release_url", response.data.html_url);
+
+  notify-release-success:
+    needs: [create-release]
+    if: always() && needs.create-release.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Google Chat release notification
+        uses: SimonScholz/google-chat-action@main
+        with:
+          webhookUrl: ${{ secrets.GOOGLE_CHAT_WEBHOOK_PROD }}
+          jobStatus: success
+          title: "✅ Release Published"
+          subtitle: "Manual release completed"
+          additionalSections: |
+            [
+              {
+                "header": "🏷️ Release",
+                "widgets": [
+                  {
+                    "decoratedText": {
+                      "topLabel": "Tag",
+                      "text": "${{ inputs.tag }}"
+                    }
+                  },
+                  {
+                    "decoratedText": {
+                      "topLabel": "Actor",
+                      "text": "${{ github.actor }}"
+                    }
+                  }
+                ]
+              },
+              {
+                "widgets": [
+                  {
+                    "buttonList": {
+                      "buttons": [
+                        {
+                          "text": "View Release",
+                          "onClick": {
+                            "openLink": {
+                              "url": "${{ needs.create-release.outputs.release_url }}"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]

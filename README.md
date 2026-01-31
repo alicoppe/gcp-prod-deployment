@@ -339,6 +339,7 @@ Deploy flow:
   - runs only after a successful `deploy-dev.yml` for the same commit on the default branch.
   - builds and pushes backend/frontend images for the current commit SHA, then deploys them.
   - if build outputs are missing (e.g., manual run with no code changes), the workflow will fall back to the latest Artifact Registry tags to avoid “image not found” failures.
+- `release.yml`: manual GitHub Release creation (tag + optional notes) for a chosen commit SHA.
 
 ### Local CI with act
 To test `ci.yml` locally before opening a PR:
