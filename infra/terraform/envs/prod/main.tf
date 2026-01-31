@@ -86,7 +86,7 @@ module "storage" {
   source      = "../../modules/storage_gcs"
   project_id  = var.project_id
   location    = var.region
-  bucket_name = "app-frontend-prod"
+  bucket_name = "app-frontend-prod-483516"
   labels      = local.labels
   force_destroy = false
   create_bucket = false
