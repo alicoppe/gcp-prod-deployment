@@ -194,6 +194,11 @@ async def root():
     return {"message": "Hello World"}
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 @app.websocket("/chat/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: UUID):
     session_id = str(uuid4())
