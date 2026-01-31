@@ -129,7 +129,7 @@ module "pubsub_scheduler" {
   source               = "../../modules/pubsub_scheduler"
   project_id           = var.project_id
   region               = var.region
-  push_endpoint        = "${module.cloud_run.backend_url}/pubsub/push"
+  push_endpoint        = "${module.cloud_run.backend_url}/api/v1/pubsub/push"
   push_service_account = module.cloud_run.backend_service_account
   labels               = local.labels
 }
