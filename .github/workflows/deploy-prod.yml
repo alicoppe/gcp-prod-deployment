@@ -28,11 +28,21 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const defaultBranch = context.payload.repository.default_branch;
-            const refName = context.ref_name;
+            const refName =
+              context.ref_name ||
+              (context.ref || "").replace("refs/heads/", "") ||
+              context.payload.ref;
             if (refName !== defaultBranch) {
               core.setFailed(`Deploy to Production must be run from ${defaultBranch}. Current ref: ${refName}`);
               return;
             }
+
+            const { data: branch } = await github.rest.repos.getBranch({
+              owner,
+              repo,
+              branch: defaultBranch,
+            });
+            const mainSha = branch.commit.sha;
 
             const { data } = await github.rest.actions.listWorkflowRunsForWorkflow({
               owner,
@@ -43,11 +53,11 @@ jobs:
               per_page: 50,
             });
 
-            const successForSha = data.workflow_runs.find(
-              (run) => run.head_sha === context.sha && run.conclusion === 'success'
+            const successForHead = data.workflow_runs.find(
+              (run) => run.head_sha === mainSha && run.conclusion === 'success'
             );
 
-            if (!successForSha) {
+            if (!successForHead) {
               const latestSuccess = data.workflow_runs.find(
                 (run) => run.conclusion === 'success'
               );
@@ -55,7 +65,7 @@ jobs:
                 ? `${latestSuccess.head_sha.slice(0, 7)} (${latestSuccess.html_url})`
                 : 'none';
               core.setFailed(
-                `Deploy to Dev has not succeeded for ${context.sha}. Latest successful dev deploy: ${latestDesc}. Run Deploy to Dev on this commit before deploying to prod.`
+                `Deploy to Dev has not succeeded for current ${defaultBranch} HEAD ${mainSha.slice(0, 7)}. Latest successful dev deploy: ${latestDesc}. Run Deploy to Dev on the latest commit before deploying to prod.`
               );
             }
 
