@@ -146,6 +146,12 @@ jobs:
           FRONTEND_IMAGE="${{ needs.build-frontend.outputs.image }}"
           IMAGE_TAG="${{ github.sha }}"
           IMAGE_REPO="${{ env.ARTIFACT_REGISTRY }}/${{ env.DEV_PROJECT_ID }}/app"
+          latest_tag() {
+            local pkg="$1"
+            gcloud artifacts docker images list "$pkg" --include-tags \
+              --format="value(tags,updateTime)" --sort-by=~updateTime --limit=1 \
+              | awk '{print $1}' | cut -d, -f1
+          }
           if [ -z "$BACKEND_IMAGE" ]; then
             BACKEND_IMAGE=$(gcloud run services describe fastapi-backend \
               --region "${{ env.GCP_REGION }}" \
@@ -172,12 +178,24 @@ jobs:
               FRONTEND_IMAGE="${IMAGE_REPO}/frontend:${IMAGE_TAG}"
             fi
           fi
+          if [ -z "$BACKEND_IMAGE" ]; then
+            LATEST_BACKEND_TAG=$(latest_tag "${IMAGE_REPO}/backend")
+            if [ -n "$LATEST_BACKEND_TAG" ]; then
+              BACKEND_IMAGE="${IMAGE_REPO}/backend:${LATEST_BACKEND_TAG}"
+            fi
+          fi
+          if [ -z "$FRONTEND_IMAGE" ]; then
+            LATEST_FRONTEND_TAG=$(latest_tag "${IMAGE_REPO}/frontend")
+            if [ -n "$LATEST_FRONTEND_TAG" ]; then
+              FRONTEND_IMAGE="${IMAGE_REPO}/frontend:${LATEST_FRONTEND_TAG}"
+            fi
+          fi
           TF_ARGS=""
           if [ -n "$BACKEND_IMAGE" ]; then TF_ARGS="$TF_ARGS -var=backend_image=$BACKEND_IMAGE"; fi
           if [ -n "$FRONTEND_IMAGE" ]; then TF_ARGS="$TF_ARGS -var=frontend_image=$FRONTEND_IMAGE"; fi
           if [ -z "$BACKEND_IMAGE" ] || [ -z "$FRONTEND_IMAGE" ]; then
-            echo "Missing backend_image or frontend_image. Build jobs were skipped and no images were found for tag ${IMAGE_TAG}."
-            echo "Push images or re-run with backend/frontend changes so build outputs exist."
+            echo "Missing backend_image or frontend_image."
+            echo "Build outputs are empty and no existing service image or latest Artifact Registry tag was found."
             exit 1
           fi
           terraform apply -auto-approve \

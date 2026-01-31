@@ -147,10 +147,51 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Resolve image tags
+      - name: Resolve images
         run: |
-          echo "BACKEND_TAG=${{ github.sha }}" >> $GITHUB_ENV
-          echo "FRONTEND_TAG=${{ github.sha }}" >> $GITHUB_ENV
+          BACKEND_IMAGE="${{ needs.build-backend-prod.outputs.image }}"
+          FRONTEND_IMAGE="${{ needs.build-frontend-prod.outputs.image }}"
+          IMAGE_TAG="${{ github.sha }}"
+          IMAGE_REPO="${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app"
+          latest_tag() {
+            local pkg="$1"
+            gcloud artifacts docker images list "$pkg" --include-tags \
+              --format="value(tags,updateTime)" --sort-by=~updateTime --limit=1 \
+              | awk '{print $1}' | cut -d, -f1
+          }
+          if [ -z "$BACKEND_IMAGE" ]; then
+            if gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
+              --filter="package=${IMAGE_REPO}/backend AND tags:${IMAGE_TAG}" \
+              --format="value(package)" | head -n 1 | grep -q backend; then
+              BACKEND_IMAGE="${IMAGE_REPO}/backend:${IMAGE_TAG}"
+            fi
+          fi
+          if [ -z "$FRONTEND_IMAGE" ]; then
+            if gcloud artifacts docker images list "$IMAGE_REPO" --include-tags \
+              --filter="package=${IMAGE_REPO}/frontend AND tags:${IMAGE_TAG}" \
+              --format="value(package)" | head -n 1 | grep -q frontend; then
+              FRONTEND_IMAGE="${IMAGE_REPO}/frontend:${IMAGE_TAG}"
+            fi
+          fi
+          if [ -z "$BACKEND_IMAGE" ]; then
+            LATEST_BACKEND_TAG=$(latest_tag "${IMAGE_REPO}/backend")
+            if [ -n "$LATEST_BACKEND_TAG" ]; then
+              BACKEND_IMAGE="${IMAGE_REPO}/backend:${LATEST_BACKEND_TAG}"
+            fi
+          fi
+          if [ -z "$FRONTEND_IMAGE" ]; then
+            LATEST_FRONTEND_TAG=$(latest_tag "${IMAGE_REPO}/frontend")
+            if [ -n "$LATEST_FRONTEND_TAG" ]; then
+              FRONTEND_IMAGE="${IMAGE_REPO}/frontend:${LATEST_FRONTEND_TAG}"
+            fi
+          fi
+          if [ -z "$BACKEND_IMAGE" ] || [ -z "$FRONTEND_IMAGE" ]; then
+            echo "Missing backend_image or frontend_image."
+            echo "Build outputs are empty and no images were found for ${IMAGE_TAG} or latest Artifact Registry tags."
+            exit 1
+          fi
+          echo "BACKEND_IMAGE=$BACKEND_IMAGE" >> $GITHUB_ENV
+          echo "FRONTEND_IMAGE=$FRONTEND_IMAGE" >> $GITHUB_ENV
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -169,8 +210,8 @@ jobs:
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
-            -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ env.BACKEND_TAG }}" \
-            -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ env.FRONTEND_TAG }}"
+            -var="backend_image=${{ env.BACKEND_IMAGE }}" \
+            -var="frontend_image=${{ env.FRONTEND_IMAGE }}"
 
       - name: Terraform apply
         run: |
@@ -179,8 +220,8 @@ jobs:
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
-            -var="backend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/backend:${{ env.BACKEND_TAG }}" \
-            -var="frontend_image=${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ env.FRONTEND_TAG }}"
+            -var="backend_image=${{ env.BACKEND_IMAGE }}" \
+            -var="frontend_image=${{ env.FRONTEND_IMAGE }}"
 
       - name: Get outputs
         id: outputs
