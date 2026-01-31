@@ -44,14 +44,17 @@ jobs:
             });
             const mainSha = branch.commit.sha;
 
-            const { data } = await github.rest.actions.listWorkflowRunsForWorkflow({
-              owner,
-              repo,
-              workflow_id: 'deploy-dev.yml',
-              branch: defaultBranch,
-              status: 'completed',
-              per_page: 50,
-            });
+            const { data } = await github.request(
+              "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs",
+              {
+                owner,
+                repo,
+                workflow_id: "deploy-dev.yml",
+                branch: defaultBranch,
+                status: "completed",
+                per_page: 50,
+              }
+            );
 
             const successForHead = data.workflow_runs.find(
               (run) => run.head_sha === mainSha && run.conclusion === 'success'
