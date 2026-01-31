@@ -345,7 +345,7 @@ if not ready:
     ready = bool(status.get("latestReadyRevision") or status.get("latestReadyRevisionName"))
 print("True" if ready else "False")
 PY
-            )
+)
             if [ "$READY_STATUS" = "True" ]; then
               echo "Service Ready after $((i * READY_INTERVAL))s"
               break
