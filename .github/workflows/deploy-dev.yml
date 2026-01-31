@@ -289,6 +289,9 @@ jobs:
     needs: [terraform-apply-dev, run-migrations-dev]
     if: always() && needs.terraform-apply-dev.result == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: google-github-actions/auth@v3
