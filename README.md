@@ -451,6 +451,32 @@ gcloud projects add-iam-policy-binding <PROJECT_ID> \
   --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
   --role="roles/run.admin"
 ```
+Terraform also needs access to read existing GCS buckets. Choose one of the following:
+
+Minimal (recommended, project-level):
+```sh
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
+  --role="roles/storage.viewer"
+```
+
+Alternative (bucket-level):
+```sh
+gcloud storage buckets add-iam-policy-binding gs://<BUCKET_NAME> \
+  --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
+  --role="roles/storage.legacyBucketReader"
+```
+
+Broad (simple, but grants far more than needed):
+```sh
+gcloud projects add-iam-policy-binding <PROJECT_ID> \
+  --member="serviceAccount:<TERRAFORM_SA_EMAIL>" \
+  --role="roles/editor"
+```
+Terraform also reads the default VPC via the Compute Engine API. Enable it in both dev and prod:
+```sh
+gcloud services enable compute.googleapis.com --project <PROJECT_ID>
+```
 
 ### GitHub Environment setup for prod
 1) Go to Settings -> Environments -> New environment -> name it `prod`.
