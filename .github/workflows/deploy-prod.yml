@@ -314,11 +314,57 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PROD }}
+          service_account: ${{ vars.GCP_SA_TERRAFORM_PROD }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Health check
         run: |
           BACKEND_URL="${{ needs.terraform-apply-prod.outputs.backend_url }}"
-          curl -f "$BACKEND_URL/health" || exit 1
-          echo "Production deployment healthy"
+          BACKEND_SERVICE="fastapi-backend"
+          READY_ATTEMPTS=18
+          READY_INTERVAL=10
+          for i in $(seq 1 $READY_ATTEMPTS); do
+            READY_STATUS=$(gcloud run services describe "$BACKEND_SERVICE" \
+              --region "${{ env.GCP_REGION }}" \
+              --project "${{ env.PROD_PROJECT_ID }}" \
+              --format="value(status.conditions[?type='Ready'].status)" || true)
+            if [ "$READY_STATUS" = "True" ]; then
+              echo "Service Ready after $((i * READY_INTERVAL))s"
+              break
+            fi
+            echo "Service not Ready yet (attempt $i/$READY_ATTEMPTS). Waiting ${READY_INTERVAL}s..."
+            sleep $READY_INTERVAL
+          done
+          if [ "$READY_STATUS" != "True" ]; then
+            echo "Service did not become Ready after $((READY_ATTEMPTS * READY_INTERVAL))s"
+            exit 1
+          fi
+          consecutive_500=0
+          for i in $(seq 1 9); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$BACKEND_URL/health" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Production deployment healthy"
+              exit 0
+            fi
+            if [ "$STATUS" = "500" ]; then
+              consecutive_500=$((consecutive_500+1))
+              if [ "$consecutive_500" -ge 4 ]; then
+                echo "Health check returned 500 four times; failing fast."
+                exit 1
+              fi
+            else
+              consecutive_500=0
+            fi
+            echo "Health check attempt $i/9 returned $STATUS. Retrying in 10s..."
+            sleep 10
+          done
+          echo "Health check failed after 90 seconds"
+          exit 1
 
       - name: Notify success
         run: |

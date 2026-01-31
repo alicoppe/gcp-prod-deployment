@@ -291,11 +291,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_DEV }}
+          service_account: ${{ vars.GCP_SA_TERRAFORM_DEV }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Health check
         run: |
           BACKEND_URL="${{ needs.terraform-apply-dev.outputs.backend_url }}"
+          BACKEND_SERVICE="fastapi-backend"
+          READY_ATTEMPTS=12
+          READY_INTERVAL=10
+          for i in $(seq 1 $READY_ATTEMPTS); do
+            READY_STATUS=$(gcloud run services describe "$BACKEND_SERVICE" \
+              --region "${{ env.GCP_REGION }}" \
+              --project "${{ env.DEV_PROJECT_ID }}" \
+              --format="value(status.conditions[?type='Ready'].status)" || true)
+            if [ "$READY_STATUS" = "True" ]; then
+              echo "Service Ready after $((i * READY_INTERVAL))s"
+              break
+            fi
+            echo "Service not Ready yet (attempt $i/$READY_ATTEMPTS). Waiting ${READY_INTERVAL}s..."
+            sleep $READY_INTERVAL
+          done
+          if [ "$READY_STATUS" != "True" ]; then
+            echo "Service did not become Ready after $((READY_ATTEMPTS * READY_INTERVAL))s"
+            exit 1
+          fi
           consecutive_500=0
-          for i in $(seq 1 3); do
+          for i in $(seq 1 6); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$BACKEND_URL/health" || true)
             if [ "$STATUS" = "200" ]; then
               echo "Dev deployment healthy"
@@ -310,10 +337,10 @@ jobs:
             else
               consecutive_500=0
             fi
-            echo "Health check attempt $i/3 returned $STATUS. Retrying in 10s..."
+            echo "Health check attempt $i/6 returned $STATUS. Retrying in 10s..."
             sleep 10
           done
-          echo "Health check failed after 30 seconds"
+          echo "Health check failed after 60 seconds"
           exit 1
 
   # Notify Google Chat that dev is ready
