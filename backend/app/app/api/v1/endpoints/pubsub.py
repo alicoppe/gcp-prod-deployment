@@ -31,5 +31,10 @@ async def handle_pubsub_push(request: Request) -> Any:
         payload = {}
 
     prompt = payload.get("prompt", "Batman is awesome because")
+    if g.sentiment_model is None:
+        return create_response(
+            message="Sentiment model unavailable; skipping processing",
+            data={"result": None},
+        )
     result = g.sentiment_model(prompt)
     return create_response(message="Pub/Sub task processed", data={"result": result})
