@@ -10,6 +10,7 @@ locals {
     env = "prod"
     app = "fastapi-react"
   }
+  vpc_connector_full_name = "projects/${var.project_id}/locations/${var.region}/connectors/serverless-connector-prod"
 }
 
 provider "google" {
@@ -113,7 +114,7 @@ module "cloud_run" {
   encrypt_key_secret_name = var.encrypt_key_secret_name
   project_name         = var.project_name
   cloud_run_deletion_protection = true
-  vpc_connector        = google_vpc_access_connector.serverless.id
+  vpc_connector        = local.vpc_connector_full_name
   labels               = local.labels
   backend_cpu          = "1"
   backend_memory       = "512Mi"
