@@ -204,3 +204,10 @@ resource "google_cloud_run_v2_service_iam_member" "frontend_invoker" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+resource "google_project_iam_member" "backend_vpcaccess_user" {
+  count   = var.vpc_connector == null ? 0 : 1
+  project = var.project_id
+  role    = "roles/vpcaccess.user"
+  member  = "serviceAccount:${google_service_account.backend.email}"
+}
