@@ -219,12 +219,7 @@ jobs:
       - name: Terraform plan
         run: |
           cd infra/terraform/envs/prod
-          TFVARS_ARG=""
-          if [ -f terraform.tfvars ]; then
-            TFVARS_ARG="-var-file=terraform.tfvars"
-          fi
           terraform plan \
-            $TFVARS_ARG \
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
@@ -234,12 +229,7 @@ jobs:
       - name: Terraform apply
         run: |
           cd infra/terraform/envs/prod
-          TFVARS_ARG=""
-          if [ -f terraform.tfvars ]; then
-            TFVARS_ARG="-var-file=terraform.tfvars"
-          fi
           terraform apply -auto-approve \
-            $TFVARS_ARG \
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
