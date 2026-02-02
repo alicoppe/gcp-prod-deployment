@@ -17,6 +17,11 @@ variable "encrypt_key_secret_name" {
   default = "encrypt-key"
 }
 
+variable "disable_deletion_protection" {
+  type    = bool
+  default = false
+}
+
 variable "vertex_ai_quota_overrides" {
   type = list(object({
     service        = string
