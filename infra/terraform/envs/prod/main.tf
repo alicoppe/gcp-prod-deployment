@@ -119,7 +119,7 @@ module "cloud_run" {
   vpc_connector        = local.vpc_connector_full_name
   labels               = local.labels
   backend_cpu          = "1"
-  backend_memory       = "512Mi"
+  backend_memory       = "2Gi"
   backend_min_instances = 0
   backend_max_instances = 1
   frontend_cpu         = "1"
