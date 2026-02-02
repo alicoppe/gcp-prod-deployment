@@ -220,6 +220,7 @@ jobs:
         run: |
           cd infra/terraform/envs/prod
           terraform plan \
+            -var-file=terraform.tfvars \
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
@@ -230,6 +231,7 @@ jobs:
         run: |
           cd infra/terraform/envs/prod
           terraform apply -auto-approve \
+            -var-file=terraform.tfvars \
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
