@@ -21,6 +21,10 @@ variable "cors_origins" {
   type    = list(string)
   default = []
 }
+variable "backend_url_override" {
+  type    = string
+  default = ""
+}
 variable "vpc_connector" {
   type    = string
   default = null
