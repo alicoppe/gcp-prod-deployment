@@ -11,6 +11,7 @@ locals {
     app = "fastapi-react"
   }
   vpc_connector_full_name = "projects/${var.project_id}/locations/${var.region}/connectors/serverless-connector-prod"
+  backend_url_for_pubsub  = var.backend_url_override != "" ? var.backend_url_override : module.cloud_run.backend_url
 }
 
 provider "google" {
@@ -112,6 +113,7 @@ module "cloud_run" {
   vertex_region        = var.vertex_region
   cors_origins         = var.allowed_origins
   encrypt_key_secret_name = var.encrypt_key_secret_name
+  backend_url_override = var.backend_url_override
   project_name         = var.project_name
   cloud_run_deletion_protection = false
   vpc_connector        = local.vpc_connector_full_name
@@ -130,7 +132,7 @@ module "pubsub_scheduler" {
   source               = "../../modules/pubsub_scheduler"
   project_id           = var.project_id
   region               = var.region
-  push_endpoint        = "${module.cloud_run.backend_url}/api/v1/pubsub/push"
+  push_endpoint        = "${local.backend_url_for_pubsub}/api/v1/pubsub/push"
   push_service_account = module.cloud_run.backend_service_account
   labels               = local.labels
 }

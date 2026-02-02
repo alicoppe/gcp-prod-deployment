@@ -147,6 +147,10 @@ resource "google_cloud_run_v2_service" "backend" {
   depends_on = [google_project_service.run_api]
 }
 
+locals {
+  frontend_api_url = var.backend_url_override != "" ? var.backend_url_override : google_cloud_run_v2_service.backend.uri
+}
+
 resource "google_cloud_run_v2_service" "frontend" {
   name     = "fastapi-frontend"
   location = var.region
@@ -166,7 +170,7 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
       env {
         name  = "VITE_API_URL"
-        value = google_cloud_run_v2_service.backend.uri
+        value = local.frontend_api_url
       }
       env {
         name  = "VITE_ASSET_BUCKET"

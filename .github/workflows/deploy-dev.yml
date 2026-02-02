@@ -200,6 +200,32 @@ jobs:
           fi
           terraform apply -auto-approve \
             -input=false \
+            -target=google_project_service.vpc_access_api \
+            -target=google_vpc_access_connector.serverless \
+            -target=module.cloud_run.google_project_service.run_api \
+            -target=module.cloud_run.google_project_service.iam_api \
+            -target=module.cloud_run.google_service_account.backend \
+            -target=module.secret_access.google_project_service.secret_api \
+            -target=module.secret_access.google_project_iam_member.backend_secret_accessor \
+            -target=module.vertex_ai.google_project_service.vertex_api \
+            -target=module.vertex_ai.google_project_iam_member.backend_vertex_user \
+            -target=module.cloud_run.google_project_iam_member.backend_vpcaccess_user \
+            -target=module.cloud_run.google_cloud_run_v2_service.backend \
+            -var="project_id=${{ env.DEV_PROJECT_ID }}" \
+            -var="region=${{ env.GCP_REGION }}" \
+            -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
+            $TF_ARGS
+          BACKEND_URL_OVERRIDE=$(gcloud run services describe fastapi-backend \
+            --region "${{ env.GCP_REGION }}" \
+            --project "${{ env.DEV_PROJECT_ID }}" \
+            --format="value(status.url)" || true)
+          if [ -z "$BACKEND_URL_OVERRIDE" ]; then
+            echo "Backend URL not found after backend apply."
+            exit 1
+          fi
+          TF_ARGS="$TF_ARGS -var=backend_url_override=$BACKEND_URL_OVERRIDE"
+          terraform apply -auto-approve \
+            -input=false \
             -var="project_id=${{ env.DEV_PROJECT_ID }}" \
             -var="region=${{ env.GCP_REGION }}" \
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \

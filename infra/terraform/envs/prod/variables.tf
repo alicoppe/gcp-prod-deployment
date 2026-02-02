@@ -17,6 +17,11 @@ variable "encrypt_key_secret_name" {
   default = "encrypt-key"
 }
 
+variable "backend_url_override" {
+  type    = string
+  default = ""
+}
+
 variable "vertex_ai_quota_overrides" {
   type = list(object({
     service        = string
