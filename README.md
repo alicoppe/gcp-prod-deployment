@@ -486,7 +486,6 @@ gcloud services enable compute.googleapis.com --project <PROJECT_ID>
 5) Migrations run under the same `prod` environment approval by default.
 
 `deploy-prod.yml` is manual, but it will only proceed if `deploy-dev.yml` has succeeded for the same commit on the default branch. It pauses at `terraform-apply-prod` until you approve in the Actions UI.
-If Terraform needs to replace a Cloud Run service in prod, set `disable_deletion_protection = true` for that run (then set it back to `false` after apply).
 
 ### Google Chat notifications (webhooks)
 1) Create a webhook in Google Chat

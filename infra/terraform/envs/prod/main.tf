@@ -113,7 +113,7 @@ module "cloud_run" {
   cors_origins         = var.allowed_origins
   encrypt_key_secret_name = var.encrypt_key_secret_name
   project_name         = var.project_name
-  cloud_run_deletion_protection = !var.disable_deletion_protection
+  cloud_run_deletion_protection = false
   vpc_connector        = local.vpc_connector_full_name
   labels               = local.labels
   backend_cpu          = "1"
