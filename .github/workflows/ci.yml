@@ -208,7 +208,13 @@ jobs:
       - name: Install dependencies
         run: |
           cd frontend
-          npm install
+          npm ci --include=optional
+
+      - name: Ensure Rollup native binary
+        run: |
+          cd frontend
+          node -e "require('@rollup/rollup-linux-x64-gnu')" 2>/dev/null || \
+            npm install --no-save --no-package-lock @rollup/rollup-linux-x64-gnu
 
       - name: Lint
         run: |

@@ -24,7 +24,3 @@ app.{$EXT_ENDPOINT1}:80, app.{$LOCAL_1}:80, app.{$LOCAL_2}:80 {
 #   root * /code/static
 #   file_server browse
 # }
-
-app.{$EXT_ENDPOINT1}:80, app.{$LOCAL_1}:80, app.{$LOCAL_2}:80 {
-  reverse_proxy frontend:5173
-}

@@ -16,7 +16,9 @@ except Exception:  # pragma: no cover - handled via runtime config
 class ChatClient:
     def __init__(self) -> None:
         self.provider = settings.CHAT_PROVIDER.lower()
-        if self.provider == "openai":
+        if self.provider == "mock":
+            self.client = None
+        elif self.provider == "openai":
             if not settings.OPENAI_API_KEY:
                 raise RuntimeError("OPENAI_API_KEY must be set when using OpenAI.")
             self.client = ChatOpenAI(
@@ -42,14 +44,22 @@ class ChatClient:
         else:
             raise RuntimeError(
                 f"Unsupported CHAT_PROVIDER '{settings.CHAT_PROVIDER}'. "
-                "Use 'vertex' or 'openai'."
+                "Use 'vertex', 'openai', or 'mock'."
             )
 
     def generate(self, prompt: str) -> str:
+        if self.provider == "mock":
+            return "LLM is not configured for local dev. Set CHAT_PROVIDER to 'vertex' or 'openai' to enable responses."
+
         if self.provider == "openai":
             result = self.client([HumanMessage(content=prompt)])
             return result.content
-
-        response: Any = self.client.generate_content(prompt)
+        try:
+            response: Any = self.client.generate_content(prompt)
+        except Exception as exc:  # pragma: no cover - runtime provider failures
+            return (
+                "LLM request failed. Configure credentials for the selected "
+                f"provider. Details: {exc}"
+            )
         text = getattr(response, "text", None)
         return text if text is not None else str(response)

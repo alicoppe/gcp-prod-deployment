@@ -14,8 +14,10 @@ from app.core.config import settings
 from app.core.security import decode_token, get_password_hash, verify_password
 from app.models.user_model import User
 from app.schemas.common_schema import IMetaGeneral, TokenType
+from app.schemas.role_schema import IRoleCreate, IRoleEnum
 from app.schemas.response_schema import IPostResponseBase, create_response
 from app.schemas.token_schema import RefreshToken, Token, TokenRead
+from app.schemas.user_schema import IUserCreate, IUserRegister
 from app.utils.token import add_token_to_redis, delete_tokens, get_valid_tokens
 
 router = APIRouter()
@@ -76,6 +78,83 @@ async def login(
     print("data", data)
     print("meta_data", meta_data)
     return create_response(meta=meta_data, data=data, message="Login correctly")
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(
+    payload: IUserRegister,
+    meta_data: IMetaGeneral = Depends(deps.get_general_meta),
+    redis_client: Redis = Depends(get_redis_client),
+) -> IPostResponseBase[Token]:
+    """
+    Public signup endpoint. Creates a user with the "user" role.
+    """
+    existing_user = await crud.user.get_by_email(email=payload.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="There is already a user with same email",
+        )
+
+    role = await crud.role.get_role_by_name(name=IRoleEnum.user.value)
+    if not role:
+        role = await crud.role.create(
+            obj_in=IRoleCreate(
+                name=IRoleEnum.user.value, description="User role"
+            )
+        )
+
+    user_in = IUserCreate(
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        email=payload.email,
+        password=payload.password,
+        is_superuser=False,
+        role_id=role.id,
+    )
+    user = await crud.user.create_with_role(obj_in=user_in)
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    refresh_token_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+    access_token = security.create_access_token(
+        user.id, expires_delta=access_token_expires
+    )
+    refresh_token = security.create_refresh_token(
+        user.id, expires_delta=refresh_token_expires
+    )
+    data = Token(
+        access_token=access_token,
+        token_type="bearer",
+        refresh_token=refresh_token,
+        user=user,
+    )
+
+    valid_access_tokens = await get_valid_tokens(
+        redis_client, user.id, TokenType.ACCESS
+    )
+    if valid_access_tokens:
+        await add_token_to_redis(
+            redis_client,
+            user,
+            access_token,
+            TokenType.ACCESS,
+            settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+        )
+    valid_refresh_tokens = await get_valid_tokens(
+        redis_client, user.id, TokenType.REFRESH
+    )
+    if valid_refresh_tokens:
+        await add_token_to_redis(
+            redis_client,
+            user,
+            refresh_token,
+            TokenType.REFRESH,
+            settings.REFRESH_TOKEN_EXPIRE_MINUTES,
+        )
+
+    return create_response(
+        meta=meta_data, data=data, message="Signup correctly"
+    )
 
 
 @router.post("/change_password")
