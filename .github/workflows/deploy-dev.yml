@@ -105,10 +105,13 @@ jobs:
   terraform-apply-dev:
     needs: [changes, build-backend, build-frontend]
     if: |
-      always() &&
       (needs.changes.outputs.infra == 'true' ||
        needs.changes.outputs.backend == 'true' ||
-       needs.changes.outputs.frontend == 'true')
+       needs.changes.outputs.frontend == 'true') &&
+      (needs.build-backend.result == 'success' ||
+        (needs.changes.outputs.backend != 'true' && needs.changes.outputs.infra != 'true')) &&
+      (needs.build-frontend.result == 'success' ||
+        (needs.changes.outputs.frontend != 'true' && needs.changes.outputs.infra != 'true'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
