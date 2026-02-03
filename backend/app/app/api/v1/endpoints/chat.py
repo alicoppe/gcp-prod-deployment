@@ -27,6 +27,34 @@ from app.utils.fastapi_globals import g
 
 router = APIRouter()
 
+MAX_CONTEXT_MESSAGES = 12
+
+
+def _format_history(messages: list[ChatMessage]) -> str:
+    lines: list[str] = []
+    for msg in messages:
+        if msg.role == ChatRoleEnum.user:
+            role = "User"
+        elif msg.role == ChatRoleEnum.assistant:
+            role = "Assistant"
+        else:
+            continue
+        lines.append(f"{role}: {msg.content}")
+    return "\n".join(lines)
+
+
+def _build_prompt(history_text: str, user_prompt: str) -> str:
+    if history_text:
+        return (
+            "You are a helpful assistant. Use the conversation history to answer.\n\n"
+            f"Conversation so far:\n{history_text}\n\n"
+            f"User: {user_prompt}\nAssistant:"
+        )
+    return (
+        "You are a helpful assistant.\n\n"
+        f"User: {user_prompt}\nAssistant:"
+    )
+
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
 async def create_chat_session(
@@ -105,6 +133,10 @@ async def send_chat_message(
             obj_current=session, obj_new={"title": title}
         )
 
+    history = await crud.chat_message.get_multi_by_session(session_id=session.id)
+    history_text = _format_history(history[-MAX_CONTEXT_MESSAGES:])
+    prompt = _build_prompt(history_text, payload.content)
+
     user_message = await crud.chat_message.create_for_session(
         session_id=session.id,
         user_id=current_user.id,
@@ -113,7 +145,7 @@ async def send_chat_message(
     )
 
     chat_client = g.chat_client
-    response_text = chat_client.generate(payload.content)
+    response_text = chat_client.generate(prompt)
     assistant_message = await crud.chat_message.create_for_session(
         session_id=session.id,
         user_id=None,

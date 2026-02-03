@@ -3,12 +3,17 @@ version: '3.8'
 services:
   fastapi_server:
     container_name: fastapi_server
+    platform: linux/amd64
     build: ./backend
     restart: always
     command: "sh -c 'alembic upgrade head && uvicorn app.main:app --reload --workers 3 --host 0.0.0.0 --port 8000'"
     #command: "sh -c 'alembic upgrade head && gunicorn -w 3 -k uvicorn.workers.UvicornWorker app.main:app  --bind 0.0.0.0:8000 --preload --log-level=debug --timeout 120'"
     volumes:
-      - ./backend/app:/code
+      - ./backend/app:/code/app
+      - ./secrets:/code/credentials:ro
+    working_dir: /code/app
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/credentials/vertex-sa.json
     expose:
       - 8000
     env_file: ".env"
@@ -64,7 +69,7 @@ services:
   frontend:
     container_name: frontend
     build: ./frontend
-    command: npm run dev -- --host --port 5173
+    command: sh -c "npm install && npm run dev -- --host --port 5173"
     restart: always
     volumes:
       - ./frontend:/app

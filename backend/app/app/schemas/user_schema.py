@@ -1,7 +1,7 @@
 from app.utils.partial import optional
 from app.models.user_model import UserBase
 from app.models.group_model import GroupBase
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from uuid import UUID
 from enum import Enum
 from .image_media_schema import IImageMediaRead
@@ -13,6 +13,13 @@ class IUserCreate(UserBase):
 
     class Config:
         hashed_password = None
+
+
+class IUserRegister(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    password: str
 
 
 # All these fields are optional

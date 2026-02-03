@@ -75,6 +75,28 @@ Services (dev):
 - It’s best to change `SECRET_KEY`, `ENCRYPT_KEY`, and the admin credentials even for local work.
 - `ENCRYPT_KEY` must be a valid Fernet key (generate via `python - <<'PY'\nfrom cryptography.fernet import Fernet\nprint(Fernet.generate_key().decode())\nPY`).
 - Only set `OPENAI_API_KEY`, `VERTEX_*`, or `GCS_*` if you plan to use those services locally.
+- For local chat without cloud credentials, set `CHAT_PROVIDER=mock`.
+- For Vertex AI in local dev, place a service account key at `secrets/vertex-sa.json`. The container mounts `./secrets` as read-only and uses `GOOGLE_APPLICATION_CREDENTIALS=/code/credentials/vertex-sa.json`.
+- Keep `secrets/` out of git (it is ignored in `.gitignore`).
+
+Vertex AI local auth (service account JSON):
+1) Create a service account key with Vertex access.
+2) Save it to `secrets/vertex-sa.json` (this folder is ignored by git).
+3) Set `CHAT_PROVIDER=vertex`, plus `VERTEX_PROJECT_ID` and `VERTEX_REGION` in `.env`.
+Example (gcloud):
+```sh
+gcloud config set project YOUR_PROJECT_ID
+gcloud iam service-accounts create fastapi-vertex-sa \
+  --display-name="FastAPI Vertex SA"
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:fastapi-vertex-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:fastapi-vertex-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/serviceusage.serviceUsageConsumer"
+gcloud iam service-accounts keys create secrets/vertex-sa.json \
+  --iam-account fastapi-vertex-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com
+```
 
 Hot reload:
 - Backend: Uvicorn `--reload`
@@ -91,7 +113,8 @@ Storage in dev:
 - Uses local filesystem at `static/uploads` (served via Caddy static host).
 
 Frontend assets:
-- React + Tailwind placeholder in `frontend/`. If running outside Compose, set `VITE_API_URL` accordingly.
+- React + Tailwind frontend in `frontend/`. Local dev uses `VITE_API_URL` (default `http://fastapi.localhost/api/v1` via `.env`).
+- Public signup endpoint: `POST /api/v1/login/register` creates a user with the `user` role.
 
 ## Testing
 - Spin up test stack: `docker compose -f docker-compose-test.yml up`
