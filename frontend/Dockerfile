@@ -1,11 +1,12 @@
 # Simple production build for the React + Vite + Tailwind frontend
-FROM node:20-alpine AS build
+# Use Debian-based image to avoid Rollup optional dependency issues on musl.
+FROM node:20-slim AS build
 WORKDIR /app
 ARG VITE_ASSET_BUCKET
 ENV VITE_ASSET_BUCKET=$VITE_ASSET_BUCKET
 COPY package.json package-lock.json* ./
-# Install deps (works whether lockfile exists or not)
-RUN npm install
+# Install deps (prefer lockfile when available)
+RUN if [ -f package-lock.json ]; then npm ci --include=optional; else npm install --include=optional; fi
 COPY . .
 RUN npm run build
 
