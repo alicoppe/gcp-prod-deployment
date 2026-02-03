@@ -14,7 +14,7 @@ const loadAuth = () => {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY)
     return raw ? JSON.parse(raw) : null
   } catch {
-    {/* Comment*/}
+    {/* Comments*/}
     return null
   }
 }
