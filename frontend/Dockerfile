@@ -1,9 +1,11 @@
-# Simple production build for the React + Vite + Tailwind frontend
-# Use Debian-based image to avoid Rollup optional dependency issues on musl.
+# Simple production build for the React + Vite + Tailwind frontend.
+# Build on Debian-based image to avoid Rollup optional dependency issues on musl.
 FROM node:20-slim AS build
 WORKDIR /app
 ARG VITE_ASSET_BUCKET
+ARG VITE_API_URL
 ENV VITE_ASSET_BUCKET=$VITE_ASSET_BUCKET
+ENV VITE_API_URL=$VITE_API_URL
 COPY package.json package-lock.json* ./
 # Install deps (prefer lockfile when available). Work around npm optional deps bug for Rollup.
 RUN if [ -f package-lock.json ]; then npm ci --include=optional; else npm install --include=optional; fi && \
@@ -12,9 +14,9 @@ RUN if [ -f package-lock.json ]; then npm ci --include=optional; else npm instal
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-COPY --from=build /app ./
-ENV PORT=8080
+# Serve the static build with nginx (no Node runtime).
+FROM nginx:alpine AS runner
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080
-CMD ["sh", "-c", "npm run preview -- --host 0.0.0.0 --port ${PORT}"]
+CMD ["nginx", "-g", "daemon off;"]

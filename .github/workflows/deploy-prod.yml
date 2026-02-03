@@ -132,8 +132,16 @@ jobs:
         id: image
         run: |
           IMAGE="${{ env.ARTIFACT_REGISTRY }}/${{ env.PROD_PROJECT_ID }}/app/frontend:${{ github.sha }}"
+          BACKEND_URL=$(gcloud run services describe fastapi-backend \
+            --project "${{ env.PROD_PROJECT_ID }}" --region "${{ env.GCP_REGION }}" \
+            --format="value(status.url)")
+          if [ -z "$BACKEND_URL" ]; then
+            echo "Backend URL not found; cannot build frontend with API URL."
+            exit 1
+          fi
           docker build -t $IMAGE -f frontend/Dockerfile \
             --build-arg VITE_ASSET_BUCKET=${{ vars.VITE_ASSET_BUCKET_PROD }} \
+            --build-arg VITE_API_URL=$BACKEND_URL \
             frontend
           docker push $IMAGE
           echo "name=$IMAGE" >> $GITHUB_OUTPUT

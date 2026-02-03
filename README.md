@@ -114,6 +114,7 @@ Storage in dev:
 
 Frontend assets:
 - React + Tailwind frontend in `frontend/`. Local dev uses `VITE_API_URL` (default `http://fastapi.localhost/api/v1` via `.env`).
+- Production images serve static assets via nginx. `VITE_API_URL` must be provided at build time (workflow passes the Cloud Run backend URL).
 - Public signup endpoint: `POST /api/v1/login/register` creates a user with the `user` role.
 
 ## Testing
