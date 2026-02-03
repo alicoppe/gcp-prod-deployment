@@ -7,11 +7,14 @@ const routes = ['login', 'signup', 'chat', 'profile']
 const API_BASE = import.meta.env.VITE_API_URL || 'http://fastapi.localhost/api/v1'
 const AUTH_STORAGE_KEY = 'fastapi_auth'
 
+
+
 const loadAuth = () => {
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY)
     return raw ? JSON.parse(raw) : null
   } catch {
+    {/* Comment*/}
     return null
   }
 }

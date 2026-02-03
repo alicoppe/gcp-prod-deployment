@@ -208,7 +208,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd frontend
-          npm install
+          npm ci --include=optional
 
       - name: Lint
         run: |
