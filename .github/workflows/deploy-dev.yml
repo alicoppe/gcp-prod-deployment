@@ -113,6 +113,7 @@ jobs:
   terraform-apply-dev:
     needs: [changes, build-backend, build-frontend]
     if: |
+      always() &&
       (needs.changes.outputs.infra == 'true' ||
        needs.changes.outputs.backend == 'true' ||
        needs.changes.outputs.frontend == 'true') &&

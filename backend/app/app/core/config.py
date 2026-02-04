@@ -2,7 +2,7 @@ import json
 import os
 from urllib.parse import quote_plus
 
-# ci: trigger deploy-dev for backend image rebuild
+# ci: trigger deploy-dev for backend image rebuild (workflow retrigger)
 from pydantic_core.core_schema import FieldValidationInfo
 from pydantic import PostgresDsn, EmailStr, AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
