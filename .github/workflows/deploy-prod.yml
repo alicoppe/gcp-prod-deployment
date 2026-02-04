@@ -228,16 +228,10 @@ jobs:
         run: |
           cd infra/terraform/envs/prod
           EXTRA_TF_ARGS=()
-          PROD_ALLOWED_ORIGINS_RAW=$(cat <<'EOF_PROD_ALLOWED_ORIGINS'
-${{ vars.PROD_ALLOWED_ORIGINS }}
-EOF_PROD_ALLOWED_ORIGINS
-)
-          PROD_ALLOWED_ORIGIN_REGEX_RAW=$(cat <<'EOF_PROD_ALLOWED_ORIGIN_REGEX'
-${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}
-EOF_PROD_ALLOWED_ORIGIN_REGEX
-)
+          PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
+          PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
           if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
-            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
+            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data=[i.strip() for i in raw.split(',') if i.strip()]; print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
             if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
               EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
             fi
@@ -292,16 +286,10 @@ EOF_PROD_ALLOWED_ORIGIN_REGEX
         run: |
           cd infra/terraform/envs/prod
           EXTRA_TF_ARGS=()
-          PROD_ALLOWED_ORIGINS_RAW=$(cat <<'EOF_PROD_ALLOWED_ORIGINS'
-${{ vars.PROD_ALLOWED_ORIGINS }}
-EOF_PROD_ALLOWED_ORIGINS
-)
-          PROD_ALLOWED_ORIGIN_REGEX_RAW=$(cat <<'EOF_PROD_ALLOWED_ORIGIN_REGEX'
-${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}
-EOF_PROD_ALLOWED_ORIGIN_REGEX
-)
+          PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
+          PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
           if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
-            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
+            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data=[i.strip() for i in raw.split(',') if i.strip()]; print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
             if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
               EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
             fi
@@ -331,16 +319,10 @@ EOF_PROD_ALLOWED_ORIGIN_REGEX
         run: |
           cd infra/terraform/envs/prod
           EXTRA_TF_ARGS=()
-          PROD_ALLOWED_ORIGINS_RAW=$(cat <<'EOF_PROD_ALLOWED_ORIGINS'
-${{ vars.PROD_ALLOWED_ORIGINS }}
-EOF_PROD_ALLOWED_ORIGINS
-)
-          PROD_ALLOWED_ORIGIN_REGEX_RAW=$(cat <<'EOF_PROD_ALLOWED_ORIGIN_REGEX'
-${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}
-EOF_PROD_ALLOWED_ORIGIN_REGEX
-)
+          PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
+          PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
           if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
-            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
+            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data=[i.strip() for i in raw.split(',') if i.strip()]; print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
             if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
               EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
             fi

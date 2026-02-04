@@ -203,16 +203,10 @@ jobs:
           fi
           TF_ARGS=""
           EXTRA_TF_ARGS=()
-          DEV_ALLOWED_ORIGINS_RAW=$(cat <<'EOF_DEV_ALLOWED_ORIGINS'
-${{ vars.DEV_ALLOWED_ORIGINS }}
-EOF_DEV_ALLOWED_ORIGINS
-)
-          DEV_ALLOWED_ORIGIN_REGEX_RAW=$(cat <<'EOF_DEV_ALLOWED_ORIGIN_REGEX'
-${{ vars.DEV_ALLOWED_ORIGIN_REGEX }}
-EOF_DEV_ALLOWED_ORIGIN_REGEX
-)
+          DEV_ALLOWED_ORIGINS_RAW="${{ vars.DEV_ALLOWED_ORIGINS }}"
+          DEV_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.DEV_ALLOWED_ORIGIN_REGEX }}"
           if [ -n "$DEV_ALLOWED_ORIGINS_RAW" ]; then
-            DEV_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')" "$DEV_ALLOWED_ORIGINS_RAW")
+            DEV_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data=[i.strip() for i in raw.split(',') if i.strip()]; print(json.dumps(data) if raw else '')" "$DEV_ALLOWED_ORIGINS_RAW")
             if [ -n "$DEV_ALLOWED_ORIGINS_JSON" ]; then
               EXTRA_TF_ARGS+=("-var=allowed_origins=$DEV_ALLOWED_ORIGINS_JSON")
             fi
