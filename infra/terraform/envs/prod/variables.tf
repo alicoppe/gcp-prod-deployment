@@ -9,11 +9,26 @@ variable "project_name" {
 }
 variable "allowed_origins" {
   type    = list(string)
-  default = ["https://your-domain.com"]
+  default = ["https://app.example.com"]
 }
 variable "allowed_origin_regex" {
   type    = string
-  default = "https://.*\\.run\\.app"
+  default = ""
+}
+
+variable "enable_load_balancer" {
+  type    = bool
+  default = false
+}
+
+variable "load_balancer_domain" {
+  type    = string
+  default = "app.example.com"
+}
+
+variable "load_balancer_api_path" {
+  type    = string
+  default = "/api/*"
 }
 
 variable "encrypt_key_secret_name" {

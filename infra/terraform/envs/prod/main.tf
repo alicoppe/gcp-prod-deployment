@@ -129,6 +129,19 @@ module "cloud_run" {
   frontend_max_instances = 1
 }
 
+module "cloud_run_load_balancer" {
+  source = "../../modules/cloud_run_load_balancer"
+  count  = var.enable_load_balancer ? 1 : 0
+
+  project_id            = var.project_id
+  region                = var.region
+  name_prefix           = "fastapi"
+  domain                = var.load_balancer_domain
+  frontend_service_name = module.cloud_run.frontend_service_name
+  backend_service_name  = module.cloud_run.backend_service_name
+  api_path              = var.load_balancer_api_path
+}
+
 module "pubsub_scheduler" {
   source               = "../../modules/pubsub_scheduler"
   project_id           = var.project_id
