@@ -228,11 +228,28 @@ jobs:
         run: |
           cd infra/terraform/envs/prod
           EXTRA_TF_ARGS=()
-          if [ -n "${{ vars.PROD_ALLOWED_ORIGINS }}" ]; then
-            EXTRA_TF_ARGS+=("-var=allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}")
+          PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
+          PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
+          if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
+            PROD_ALLOWED_ORIGINS_JSON=$(python - <<'PY'
+import json, os
+raw = os.environ.get("PROD_ALLOWED_ORIGINS_RAW", "").strip()
+if not raw:
+    print("")
+    raise SystemExit(0)
+if raw.startswith("["):
+    data = json.loads(raw)
+else:
+    data = [item.strip() for item in raw.split(",") if item.strip()]
+print(json.dumps(data))
+PY
+)
+            if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
+              EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
+            fi
           fi
-          if [ -n "${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}" ]; then
-            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}")
+          if [ -n "$PROD_ALLOWED_ORIGIN_REGEX_RAW" ]; then
+            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=$PROD_ALLOWED_ORIGIN_REGEX_RAW")
           fi
           if [ -n "${{ vars.PROD_ENABLE_LOAD_BALANCER }}" ]; then
             EXTRA_TF_ARGS+=("-var=enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}")
@@ -281,11 +298,28 @@ jobs:
         run: |
           cd infra/terraform/envs/prod
           EXTRA_TF_ARGS=()
-          if [ -n "${{ vars.PROD_ALLOWED_ORIGINS }}" ]; then
-            EXTRA_TF_ARGS+=("-var=allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}")
+          PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
+          PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
+          if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
+            PROD_ALLOWED_ORIGINS_JSON=$(python - <<'PY'
+import json, os
+raw = os.environ.get("PROD_ALLOWED_ORIGINS_RAW", "").strip()
+if not raw:
+    print("")
+    raise SystemExit(0)
+if raw.startswith("["):
+    data = json.loads(raw)
+else:
+    data = [item.strip() for item in raw.split(",") if item.strip()]
+print(json.dumps(data))
+PY
+)
+            if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
+              EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
+            fi
           fi
-          if [ -n "${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}" ]; then
-            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}")
+          if [ -n "$PROD_ALLOWED_ORIGIN_REGEX_RAW" ]; then
+            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=$PROD_ALLOWED_ORIGIN_REGEX_RAW")
           fi
           if [ -n "${{ vars.PROD_ENABLE_LOAD_BALANCER }}" ]; then
             EXTRA_TF_ARGS+=("-var=enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}")
@@ -309,11 +343,28 @@ jobs:
         run: |
           cd infra/terraform/envs/prod
           EXTRA_TF_ARGS=()
-          if [ -n "${{ vars.PROD_ALLOWED_ORIGINS }}" ]; then
-            EXTRA_TF_ARGS+=("-var=allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}")
+          PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
+          PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
+          if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
+            PROD_ALLOWED_ORIGINS_JSON=$(python - <<'PY'
+import json, os
+raw = os.environ.get("PROD_ALLOWED_ORIGINS_RAW", "").strip()
+if not raw:
+    print("")
+    raise SystemExit(0)
+if raw.startswith("["):
+    data = json.loads(raw)
+else:
+    data = [item.strip() for item in raw.split(",") if item.strip()]
+print(json.dumps(data))
+PY
+)
+            if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
+              EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
+            fi
           fi
-          if [ -n "${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}" ]; then
-            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}")
+          if [ -n "$PROD_ALLOWED_ORIGIN_REGEX_RAW" ]; then
+            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=$PROD_ALLOWED_ORIGIN_REGEX_RAW")
           fi
           if [ -n "${{ vars.PROD_ENABLE_LOAD_BALANCER }}" ]; then
             EXTRA_TF_ARGS+=("-var=enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}")
