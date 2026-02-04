@@ -227,21 +227,21 @@ jobs:
       - name: Terraform apply (backend only to get URL)
         run: |
           cd infra/terraform/envs/prod
-          EXTRA_TF_ARGS=""
+          EXTRA_TF_ARGS=()
           if [ -n "${{ vars.PROD_ALLOWED_ORIGINS }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var='allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}'"
+            EXTRA_TF_ARGS+=("-var=allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}")
           fi
           if [ -n "${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}\""
+            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}")
           fi
           if [ -n "${{ vars.PROD_ENABLE_LOAD_BALANCER }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}\""
+            EXTRA_TF_ARGS+=("-var=enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}")
           fi
           if [ -n "${{ vars.PROD_LOAD_BALANCER_DOMAIN }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"load_balancer_domain=${{ vars.PROD_LOAD_BALANCER_DOMAIN }}\""
+            EXTRA_TF_ARGS+=("-var=load_balancer_domain=${{ vars.PROD_LOAD_BALANCER_DOMAIN }}")
           fi
           if [ -n "${{ vars.PROD_LOAD_BALANCER_API_PATH }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"load_balancer_api_path=${{ vars.PROD_LOAD_BALANCER_API_PATH }}\""
+            EXTRA_TF_ARGS+=("-var=load_balancer_api_path=${{ vars.PROD_LOAD_BALANCER_API_PATH }}")
           fi
           terraform apply -auto-approve \
             -target=google_project_service.vpc_access_api \
@@ -260,7 +260,7 @@ jobs:
             -var="vertex_region=${{ vars.VERTEX_REGION || env.GCP_REGION }}" \
             -var="backend_image=${{ env.BACKEND_IMAGE }}" \
             -var="frontend_image=${{ env.FRONTEND_IMAGE }}" \
-            $EXTRA_TF_ARGS
+            "${EXTRA_TF_ARGS[@]}"
 
       - name: Resolve backend URL override
         run: |
@@ -280,21 +280,21 @@ jobs:
       - name: Terraform plan
         run: |
           cd infra/terraform/envs/prod
-          EXTRA_TF_ARGS=""
+          EXTRA_TF_ARGS=()
           if [ -n "${{ vars.PROD_ALLOWED_ORIGINS }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var='allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}'"
+            EXTRA_TF_ARGS+=("-var=allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}")
           fi
           if [ -n "${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}\""
+            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}")
           fi
           if [ -n "${{ vars.PROD_ENABLE_LOAD_BALANCER }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}\""
+            EXTRA_TF_ARGS+=("-var=enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}")
           fi
           if [ -n "${{ vars.PROD_LOAD_BALANCER_DOMAIN }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"load_balancer_domain=${{ vars.PROD_LOAD_BALANCER_DOMAIN }}\""
+            EXTRA_TF_ARGS+=("-var=load_balancer_domain=${{ vars.PROD_LOAD_BALANCER_DOMAIN }}")
           fi
           if [ -n "${{ vars.PROD_LOAD_BALANCER_API_PATH }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"load_balancer_api_path=${{ vars.PROD_LOAD_BALANCER_API_PATH }}\""
+            EXTRA_TF_ARGS+=("-var=load_balancer_api_path=${{ vars.PROD_LOAD_BALANCER_API_PATH }}")
           fi
           terraform plan \
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
@@ -303,26 +303,26 @@ jobs:
             -var="backend_image=${{ env.BACKEND_IMAGE }}" \
             -var="frontend_image=${{ env.FRONTEND_IMAGE }}" \
             -var="backend_url_override=${{ env.BACKEND_URL_OVERRIDE }}" \
-            $EXTRA_TF_ARGS
+            "${EXTRA_TF_ARGS[@]}"
 
       - name: Terraform apply
         run: |
           cd infra/terraform/envs/prod
-          EXTRA_TF_ARGS=""
+          EXTRA_TF_ARGS=()
           if [ -n "${{ vars.PROD_ALLOWED_ORIGINS }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var='allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}'"
+            EXTRA_TF_ARGS+=("-var=allowed_origins=${{ vars.PROD_ALLOWED_ORIGINS }}")
           fi
           if [ -n "${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}\""
+            EXTRA_TF_ARGS+=("-var=allowed_origin_regex=${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}")
           fi
           if [ -n "${{ vars.PROD_ENABLE_LOAD_BALANCER }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}\""
+            EXTRA_TF_ARGS+=("-var=enable_load_balancer=${{ vars.PROD_ENABLE_LOAD_BALANCER }}")
           fi
           if [ -n "${{ vars.PROD_LOAD_BALANCER_DOMAIN }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"load_balancer_domain=${{ vars.PROD_LOAD_BALANCER_DOMAIN }}\""
+            EXTRA_TF_ARGS+=("-var=load_balancer_domain=${{ vars.PROD_LOAD_BALANCER_DOMAIN }}")
           fi
           if [ -n "${{ vars.PROD_LOAD_BALANCER_API_PATH }}" ]; then
-            EXTRA_TF_ARGS="$EXTRA_TF_ARGS -var=\"load_balancer_api_path=${{ vars.PROD_LOAD_BALANCER_API_PATH }}\""
+            EXTRA_TF_ARGS+=("-var=load_balancer_api_path=${{ vars.PROD_LOAD_BALANCER_API_PATH }}")
           fi
           terraform apply -auto-approve \
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
@@ -331,7 +331,7 @@ jobs:
             -var="backend_image=${{ env.BACKEND_IMAGE }}" \
             -var="frontend_image=${{ env.FRONTEND_IMAGE }}" \
             -var="backend_url_override=${{ env.BACKEND_URL_OVERRIDE }}" \
-            $EXTRA_TF_ARGS
+            "${EXTRA_TF_ARGS[@]}"
 
       - name: Get outputs
         id: outputs
