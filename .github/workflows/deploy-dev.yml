@@ -206,7 +206,7 @@ jobs:
           DEV_ALLOWED_ORIGINS_RAW="${{ vars.DEV_ALLOWED_ORIGINS }}"
           DEV_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.DEV_ALLOWED_ORIGIN_REGEX }}"
           if [ -n "$DEV_ALLOWED_ORIGINS_RAW" ]; then
-            DEV_ALLOWED_ORIGINS_JSON=$(python -c "import json, os; raw=os.environ.get('DEV_ALLOWED_ORIGINS_RAW','').strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')")
+            DEV_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')" "$DEV_ALLOWED_ORIGINS_RAW")
             if [ -n "$DEV_ALLOWED_ORIGINS_JSON" ]; then
               EXTRA_TF_ARGS+=("-var=allowed_origins=$DEV_ALLOWED_ORIGINS_JSON")
             fi
