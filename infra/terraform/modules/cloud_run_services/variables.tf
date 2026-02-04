@@ -21,6 +21,10 @@ variable "cors_origins" {
   type    = list(string)
   default = []
 }
+variable "cors_origin_regex" {
+  type    = string
+  default = ""
+}
 variable "backend_url_override" {
   type    = string
   default = ""

@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ENCRYPT_KEY: str = _default_encrypt_key()
     BACKEND_CORS_ORIGINS: list[str] | list[AnyHttpUrl]
+    BACKEND_CORS_ORIGIN_REGEX: str | None = None
 
     @field_validator("ENCRYPT_KEY", mode="before")
     def validate_encrypt_key(cls, v: str | None) -> str:

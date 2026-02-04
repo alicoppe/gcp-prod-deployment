@@ -3,3 +3,5 @@ region         = "us-central1"
 vertex_region  = "us-central1"
 backend_image  = "us-central1-docker.pkg.dev/dev-deployment-<project-id>/app/backend:dev"
 frontend_image = "us-central1-docker.pkg.dev/dev-deployment-<project-id>/app/frontend:dev"
+allowed_origins = ["http://fastapi.localhost", "http://app.localhost"]
+allowed_origin_regex = ""

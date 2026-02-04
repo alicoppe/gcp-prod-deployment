@@ -112,6 +112,7 @@ module "cloud_run" {
   vertex_project_id    = var.project_id
   vertex_region        = var.vertex_region
   cors_origins         = var.allowed_origins
+  cors_origin_regex    = var.allowed_origin_regex
   encrypt_key_secret_name = var.encrypt_key_secret_name
   backend_url_override = var.backend_url_override
   project_name         = var.project_name

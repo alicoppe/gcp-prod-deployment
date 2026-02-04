@@ -11,6 +11,10 @@ variable "allowed_origins" {
   type    = list(string)
   default = ["http://fastapi.localhost", "http://app.localhost"]
 }
+variable "allowed_origin_regex" {
+  type    = string
+  default = ""
+}
 
 variable "encrypt_key_secret_name" {
   type    = string

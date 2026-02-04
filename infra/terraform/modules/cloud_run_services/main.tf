@@ -96,6 +96,13 @@ resource "google_cloud_run_v2_service" "backend" {
         value = join(",", var.cors_origins)
       }
       dynamic "env" {
+        for_each = var.cors_origin_regex == "" ? [] : [var.cors_origin_regex]
+        content {
+          name  = "BACKEND_CORS_ORIGIN_REGEX"
+          value = env.value
+        }
+      }
+      dynamic "env" {
         for_each = var.encrypt_key_secret_name == null || var.encrypt_key_secret_name == "" ? [] : [var.encrypt_key_secret_name]
         content {
           name = "ENCRYPT_KEY"
