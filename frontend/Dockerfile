@@ -14,9 +14,11 @@ RUN if [ -f package-lock.json ]; then npm ci --include=optional; else npm instal
 COPY . .
 RUN npm run build
 
-# Serve the static build with nginx (no Node runtime).
-FROM nginx:alpine AS runner
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+# Lightweight Node server for dynamic/runtime config needs.
+FROM node:20-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/dist ./dist
+COPY server.js ./server.js
 EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]

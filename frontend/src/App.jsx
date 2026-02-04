@@ -4,7 +4,18 @@ import remarkGfm from 'remark-gfm'
 import rehypeSanitize from 'rehype-sanitize'
 
 const routes = ['login', 'signup', 'chat', 'profile']
-const API_BASE = import.meta.env.VITE_API_URL || 'http://fastapi.localhost/api/v1'
+const runtimeConfig = window.__APP_CONFIG__ || {}
+
+const normalizeApiBase = (value) => {
+  if (!value) return ''
+  const trimmed = String(value).replace(/\/+$/, '')
+  if (trimmed.endsWith('/api/v1')) return trimmed
+  return `${trimmed}/api/v1`
+}
+
+const API_BASE =
+  normalizeApiBase(runtimeConfig.VITE_API_URL || import.meta.env.VITE_API_URL) ||
+  'http://fastapi.localhost/api/v1'
 const AUTH_STORAGE_KEY = 'fastapi_auth'
 
 
@@ -53,12 +64,30 @@ const apiRequest = async (path, { method = 'GET', body, token } = {}) => {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_BASE}${path}`, options)
+  let response
+  try {
+    response = await fetch(`${API_BASE}${path}`, options)
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : 'Network request failed'
+    throw new Error(message)
+  }
+
   const text = await response.text()
-  const data = text ? JSON.parse(text) : null
+  let data = null
+  if (text) {
+    try {
+      data = JSON.parse(text)
+    } catch {
+      data = null
+    }
+  }
 
   if (!response.ok) {
-    const message = data?.detail || data?.message || 'Request failed'
+    const message =
+      data?.detail || data?.message || response.statusText || 'Request failed'
     throw new Error(message)
   }
   return data
@@ -145,20 +174,25 @@ const AuthShell = ({ title, subtitle, imageUrls, children, onNavigate, route }) 
         <h2 className="mt-4 text-4xl md:text-5xl font-display text-slate-900">{title}</h2>
         <p className="mt-4 text-slate-600 text-lg">{subtitle}</p>
         <div className="mt-8 grid grid-cols-3 gap-3">
-          {imageUrls.map((src, idx) => (
+          {imageUrls.map((image, idx) => (
             <div
-              key={src}
+              key={image.primary}
               className={`relative aspect-[4/5] overflow-hidden rounded-2xl border border-white/70 shadow-lg ${
                 idx === 1 ? 'translate-y-3' : idx === 2 ? '-translate-y-2' : ''
               }`}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-[rgba(255,112,87,0.18)] via-white to-[rgba(8,145,178,0.15)]" />
               <img
-                src={src}
+                src={image.primary}
                 alt="Signup visual"
                 className="relative h-full w-full object-cover"
                 loading="lazy"
                 onError={(event) => {
+                  if (!event.currentTarget.dataset.fallback && image.fallback) {
+                    event.currentTarget.dataset.fallback = 'true'
+                    event.currentTarget.src = image.fallback
+                    return
+                  }
                   event.currentTarget.style.display = 'none'
                 }}
               />
@@ -761,14 +795,28 @@ function App() {
   }
 
   const assetBase = useMemo(() => {
-    const bucket = import.meta.env.VITE_ASSET_BUCKET
-    return bucket ? `https://storage.googleapis.com/${bucket}` : ''
+    const bucketOrUrl =
+      runtimeConfig.VITE_ASSET_BUCKET || import.meta.env.VITE_ASSET_BUCKET
+    if (!bucketOrUrl) return ''
+    if (bucketOrUrl.startsWith('http://') || bucketOrUrl.startsWith('https://')) {
+      return bucketOrUrl.replace(/\/+$/, '')
+    }
+    return `https://storage.googleapis.com/${bucketOrUrl}`
   }, [])
 
   const imageUrls = [
-    `${assetBase}/images/signup-hero-1.jpg`,
-    `${assetBase}/images/signup-hero-2.jpg`,
-    `${assetBase}/images/signup-hero-3.jpg`,
+    {
+      primary: `${assetBase}/images/signup-hero-1.jpg`,
+      fallback: '/images/signup-hero-1.jpg',
+    },
+    {
+      primary: `${assetBase}/images/signup-hero-2.jpg`,
+      fallback: '/images/signup-hero-2.jpg',
+    },
+    {
+      primary: `${assetBase}/images/signup-hero-3.jpg`,
+      fallback: '/images/signup-hero-3.jpg',
+    },
   ]
 
   const secureRoute = ['chat', 'profile']

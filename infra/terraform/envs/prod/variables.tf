@@ -11,6 +11,10 @@ variable "allowed_origins" {
   type    = list(string)
   default = ["https://your-domain.com"]
 }
+variable "allowed_origin_regex" {
+  type    = string
+  default = "https://.*\\.run\\.app"
+}
 
 variable "encrypt_key_secret_name" {
   type    = string
