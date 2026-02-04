@@ -1,5 +1,6 @@
 import json
 import os
+from urllib.parse import quote_plus
 from pydantic_core.core_schema import FieldValidationInfo
 from pydantic import PostgresDsn, EmailStr, AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -57,13 +58,23 @@ class Settings(BaseSettings):
                 )
                 if any(info.data.get(key) in (None, "") for key in required_keys):
                     return v
+                db_host = info.data["DATABASE_HOST"]
+                db_user = info.data["DATABASE_USER"]
+                db_password = info.data["DATABASE_PASSWORD"]
+                db_name = info.data["DATABASE_NAME"]
+                if isinstance(db_host, str) and db_host.startswith("/cloudsql/"):
+                    return (
+                        "postgresql+asyncpg://"
+                        f"{quote_plus(db_user)}:{quote_plus(db_password)}@/"
+                        f"{quote_plus(db_name)}?host={quote_plus(db_host)}"
+                    )
                 return PostgresDsn.build(
                     scheme="postgresql+asyncpg",
-                    username=info.data["DATABASE_USER"],
-                    password=info.data["DATABASE_PASSWORD"],
-                    host=info.data["DATABASE_HOST"],
+                    username=db_user,
+                    password=db_password,
+                    host=db_host,
                     port=info.data["DATABASE_PORT"],
-                    path=info.data["DATABASE_NAME"],
+                    path=db_name,
                 )
         return v
 
