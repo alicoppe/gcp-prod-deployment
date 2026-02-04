@@ -231,7 +231,7 @@ jobs:
           PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
           PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
           if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
-            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, os; raw=os.environ.get('PROD_ALLOWED_ORIGINS_RAW','').strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')")
+            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
             if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
               EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
             fi
@@ -289,7 +289,7 @@ jobs:
           PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
           PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
           if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
-            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, os; raw=os.environ.get('PROD_ALLOWED_ORIGINS_RAW','').strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')")
+            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
             if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
               EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
             fi
@@ -322,7 +322,7 @@ jobs:
           PROD_ALLOWED_ORIGINS_RAW="${{ vars.PROD_ALLOWED_ORIGINS }}"
           PROD_ALLOWED_ORIGIN_REGEX_RAW="${{ vars.PROD_ALLOWED_ORIGIN_REGEX }}"
           if [ -n "$PROD_ALLOWED_ORIGINS_RAW" ]; then
-            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, os; raw=os.environ.get('PROD_ALLOWED_ORIGINS_RAW','').strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')")
+            PROD_ALLOWED_ORIGINS_JSON=$(python -c "import json, sys; raw=sys.argv[1].strip(); data = [] if not raw else (json.loads(raw) if raw.startswith('[') else [i.strip() for i in raw.split(',') if i.strip()]); print(json.dumps(data) if raw else '')" "$PROD_ALLOWED_ORIGINS_RAW")
             if [ -n "$PROD_ALLOWED_ORIGINS_JSON" ]; then
               EXTRA_TF_ARGS+=("-var=allowed_origins=$PROD_ALLOWED_ORIGINS_JSON")
             fi
