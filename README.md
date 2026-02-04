@@ -569,8 +569,10 @@ Deploy to prod:
 - Cloud Run: in `infra/terraform/envs/*/main.tf` → `module "cloud_run"`:
   - `backend_cpu`, `backend_memory`, `backend_min_instances`, `backend_max_instances`.
   - `frontend_cpu`, `frontend_memory`, `frontend_min_instances`, `frontend_max_instances`.
-  - `cors_origins`, `vpc_connector`.
+  - `cors_origins`, `cors_origin_regex`, `backend_url_override`, `vpc_connector`.
   - `cloud_run_deletion_protection` (set to `false` in dev to allow replacements; `true` in prod for safety).
+- Load Balancer (optional, prod): in `infra/terraform/envs/prod/main.tf` → `module "cloud_run_load_balancer"`:
+  - `enable_load_balancer`, `load_balancer_domain`, `load_balancer_api_path`.
 - Storage: bucket names (`app-frontend-dev/prod`), `force_destroy` flag.
 - Scheduler: cron (`schedule`), payload JSON, time zone.
 - Artifact Registry: repo id/region if you change from `app` / `us-central1`.
@@ -596,6 +598,32 @@ vertex_ai_quota_overrides = [
   }
 ]
 ```
+
+## Custom Domain + HTTPS Load Balancer (Optional, Prod)
+If you want a stable custom domain (recommended for prod), enable the optional HTTPS load balancer that routes:
+- `/api/*` → Cloud Run backend
+- everything else → Cloud Run frontend
+
+Steps:
+1) In `infra/terraform/envs/prod/terraform.tfvars`, set:
+```hcl
+enable_load_balancer = true
+load_balancer_domain = "app.example.com"
+load_balancer_api_path = "/api/*"
+
+# Recommended: point the frontend at the same domain to avoid CORS.
+backend_url_override = "https://app.example.com"
+
+# Lock CORS to your prod domain (regex disabled in prod by default).
+allowed_origins = ["https://app.example.com"]
+allowed_origin_regex = ""
+```
+2) `terraform apply` in `infra/terraform/envs/prod`.
+3) Add a DNS **A** record for `app.example.com` pointing to the `load_balancer_ip` output.
+
+Notes:
+- The managed SSL certificate is provisioned automatically, but may take a few minutes.
+- Leave `allowed_origin_regex` empty in prod unless you intentionally want to trust all `*.run.app` origins.
 
 ## Infra Breakdown
 - Cloud Run (backend & frontend, v2): serves API and React app; envs include DB URL, Redis host/port, GCS bucket, CORS, Vertex project/region.
