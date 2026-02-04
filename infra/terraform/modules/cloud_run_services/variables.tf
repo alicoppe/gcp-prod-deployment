@@ -2,11 +2,14 @@ variable "project_id" { type = string }
 variable "region"     { type = string }
 variable "backend_image" { type = string }
 variable "frontend_image" { type = string }
-variable "db_connection_string" { type = string }
 variable "db_user" { type = string }
 variable "db_name" { type = string }
 variable "db_host" { type = string }
 variable "db_port" { type = number }
+variable "db_connection_name" {
+  type    = string
+  default = ""
+}
 variable "db_password_secret_name" {
   type    = string
   default = "db-password"

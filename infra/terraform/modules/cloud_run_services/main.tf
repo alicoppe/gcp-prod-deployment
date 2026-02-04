@@ -22,6 +22,11 @@ resource "google_service_account" "frontend" {
   depends_on   = [google_project_service.iam_api]
 }
 
+locals {
+  use_cloudsql  = var.db_connection_name != ""
+  db_host_value = local.use_cloudsql ? "/cloudsql/${var.db_connection_name}" : var.db_host
+}
+
 resource "google_cloud_run_v2_service" "backend" {
   name     = "fastapi-backend"
   location = var.region
@@ -38,10 +43,6 @@ resource "google_cloud_run_v2_service" "backend" {
           memory = var.backend_memory
         }
         cpu_idle = true
-      }
-      env {
-        name  = "DATABASE_URL"
-        value = var.db_connection_string
       }
       env {
         name  = "DATABASE_USER"
@@ -61,7 +62,7 @@ resource "google_cloud_run_v2_service" "backend" {
       }
       env {
         name  = "DATABASE_HOST"
-        value = var.db_host
+        value = local.db_host_value
       }
       env {
         name  = "DATABASE_PORT"
@@ -129,6 +130,22 @@ resource "google_cloud_run_v2_service" "backend" {
       env {
         name  = "PROJECT_NAME"
         value = var.project_name
+      }
+      dynamic "volume_mounts" {
+        for_each = local.use_cloudsql ? [1] : []
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
+      }
+    }
+    dynamic "volumes" {
+      for_each = local.use_cloudsql ? [1] : []
+      content {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [var.db_connection_name]
+        }
       }
     }
     dynamic "vpc_access" {
@@ -220,5 +237,12 @@ resource "google_project_iam_member" "backend_vpcaccess_user" {
   count   = var.vpc_connector == null ? 0 : 1
   project = var.project_id
   role    = "roles/vpcaccess.user"
+  member  = "serviceAccount:${google_service_account.backend.email}"
+}
+
+resource "google_project_iam_member" "backend_cloudsql_client" {
+  count   = local.use_cloudsql ? 1 : 0
+  project = var.project_id
+  role    = "roles/cloudsql.client"
   member  = "serviceAccount:${google_service_account.backend.email}"
 }
