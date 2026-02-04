@@ -119,6 +119,7 @@ module "cloud_run" {
   project_name         = var.project_name
   cloud_run_deletion_protection = false
   vpc_connector        = local.vpc_connector_full_name
+  vpc_egress           = "PRIVATE_RANGES_ONLY"
   labels               = local.labels
   backend_cpu          = "1"
   backend_memory       = "1Gi"

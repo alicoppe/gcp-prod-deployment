@@ -36,6 +36,10 @@ variable "vpc_connector" {
   type    = string
   default = null
 }
+variable "vpc_egress" {
+  type    = string
+  default = "PRIVATE_RANGES_ONLY"
+}
 variable "labels" {
   type    = map(string)
   default = {}

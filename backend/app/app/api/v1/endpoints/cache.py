@@ -12,7 +12,7 @@ router = APIRouter()
 @cache(expire=10)
 async def get_a_cached_response() -> IGetResponseBase[str | datetime]:
     """
-    Gets cached datetime
+    Gets a cached datetime
     """
     return create_response(data=datetime.now())
 
