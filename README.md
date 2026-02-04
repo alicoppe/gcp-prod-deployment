@@ -626,7 +626,7 @@ Notes:
 - Leave `allowed_origin_regex` empty in prod unless you intentionally want to trust all `*.run.app` origins.
 
 ## Infra Breakdown
-- Cloud Run (backend & frontend, v2): serves API and React app; envs include DB user/host/port, Redis host/port, GCS bucket, CORS, Vertex project/region. When `db_connection_name` is set, the backend connects to Cloud SQL via the Cloud SQL connector using the Unix socket at `/cloudsql/<connection_name>`.
+- Cloud Run (backend & frontend, v2): serves API and React app; envs include DB user/host/port, Redis host/port, GCS bucket, CORS, Vertex project/region. When `db_connection_name` is set, the backend connects to Cloud SQL via the Cloud SQL connector using the Unix socket at `/cloudsql/<connection_name>`. VPC connector egress is set to `PRIVATE_RANGES_ONLY` to keep private services reachable while allowing public API access.
 - Cloud SQL (Postgres): main DB. Backend SA needs `roles/cloudsql.client` when using the connector.
 - Redis (Memorystore): cache/rate limit; requires private access if kept—otherwise replace with public Redis.
 - Cloud Storage: uploads/assets; backend issues signed URLs.

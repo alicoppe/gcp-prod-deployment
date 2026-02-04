@@ -152,7 +152,7 @@ resource "google_cloud_run_v2_service" "backend" {
       for_each = var.vpc_connector == null ? [] : [var.vpc_connector]
       content {
         connector = vpc_access.value
-        egress    = "ALL_TRAFFIC"
+        egress    = var.vpc_egress
       }
     }
     labels = var.labels
