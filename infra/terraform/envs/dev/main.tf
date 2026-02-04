@@ -101,9 +101,9 @@ module "cloud_run" {
   backend_image  = var.backend_image
   frontend_image = var.frontend_image
 
-  db_connection_string = module.sql.uri
   db_user              = module.sql.db_user
   db_name              = module.sql.db_name
+  db_connection_name   = module.sql.connection_name
   db_host              = module.sql.public_ip
   db_port              = 5432
   db_password_secret_name = "db-password"
