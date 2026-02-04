@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     CHAT_PROVIDER: str = "vertex"  # vertex | openai
     VERTEX_PROJECT_ID: str | None = None
     VERTEX_REGION: str | None = None
-    VERTEX_MODEL: str = "gemini-1.5-flash"
+    VERTEX_MODEL: str = "gemini-2.5-flash-lite"
     DATABASE_USER: str
     DATABASE_PASSWORD: str
     DATABASE_HOST: str
